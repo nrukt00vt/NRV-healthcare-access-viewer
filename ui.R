@@ -7,7 +7,8 @@ sidebarLayout(
   # Sidebar with a slider and selection inputs
   sidebarPanel(
     selectInput("NAICS_selection", "Choose code:",
-                choices = uniqueNAICS),
+                choices = uniqueNAICS,
+                selected = uniqueNAICS[1]),
     actionButton("update", "Update map"),
    
   ),

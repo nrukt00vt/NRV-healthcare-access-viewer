@@ -1,6 +1,6 @@
 
 function(input, output, session) {
-  naics_id <- reactive({input$NAICS_selection})
+  naics_id <- as.numeric(input$NAICS_selection)
   print(naics_id)
   subset_trips <- subset(overall_trips, naics_code == naics_id)#%>% distinct(location_name, .keep_all = TRUE)
   
