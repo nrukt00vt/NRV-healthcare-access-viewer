@@ -13,6 +13,7 @@ montgomery_health_POIs = subset(health_POIs, city == "Blacksburg" | city == "Chr
 all_data = read.csv("base_files/overall_trips_VA.csv")
 overall_trips = merge(montgomery_health_POIs,all_data, by.x="safegraph_place_id",by.y="safegraph_place")
 
+uniqueLocations <- overall_trips %>% distinct(safegraph_place_id, .keep_all = TRUE)
 uniqueNAICS = unique(uniqueLocations$naics_code)
 print("done prep")
 
