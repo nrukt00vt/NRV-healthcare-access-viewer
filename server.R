@@ -34,13 +34,14 @@ function(input, output, session) {
     names(uniqueLocations) = c("location_name","num_visitors")
     uniqueLocations = merge(x=uniqueLocations,y=unique(subset_trips()[,c("location_name","safegraph_place_id","latitude","longitude")]))
     
-    mypallet <- colorNumeric( palette="Spectral", domain=log10(shapefile_visited$num_visitors), na.color='black')
+    mypallet <- colorNumeric( palette="YlOrRd", domain=c(0,log10(maximum_value)),na.color='black')#shapefile_visited$num_visitors), na.color='black')
     leaflet(shapefile_visited) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
       addPolygons(
         fillColor = ~mypallet(log10(num_visitors)),
         weight = 2,
         opacity = 1,
+        fillOpacity = .8,
         color = 'lightgrey',
         highlightOptions = highlightOptions(
           weight = 5,

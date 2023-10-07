@@ -13,7 +13,7 @@ sidebarLayout(
   ),
   # Show Word Cloud
   mainPanel(
-    leafletOutput("outputmap")
+    leafletOutput("outputmap",height = 1000)
   )
 )
 )

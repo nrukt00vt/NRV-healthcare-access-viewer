@@ -15,5 +15,6 @@ overall_trips = merge(montgomery_health_POIs,all_data, by.x="safegraph_place_id"
 
 uniqueLocations <- overall_trips %>% distinct(safegraph_place_id, .keep_all = TRUE)
 uniqueNAICS = unique(uniqueLocations$naics_code)
+maximum_value = max(aggregate(overall_trips[,c("total_visitors")],by = list(overall_trips$visitor_home_cbg, overall_trips$naics_code),FUN = sum)$x)
 print("done prep")
 
