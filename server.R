@@ -20,7 +20,7 @@ function(input, output, session) {
     icon = "ios-medkit",
     iconColor = 'blue',
     library = 'ion',
-    markerColor = "red"
+    markerColor = "green"
   )
   
 
