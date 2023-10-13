@@ -8,7 +8,7 @@ sidebarLayout(
   sidebarPanel(
     selectInput("NAICS_selection", "Choose code:",
                 choices = uniqueNAICS,
-                selected = 0),
+                selected = 0)
    
   ),
   # Show Word Cloud
