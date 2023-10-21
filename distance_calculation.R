@@ -4,12 +4,12 @@ library(tidyverse)
 #Read in the shapefile as an "sf" object
 shapefile = read_sf(dsn ="base_files", layer= "tl_2022_51_bg")
 #Choose HealthPOIs_Montgomery_VA.csv
-health_POIs = read.csv('base_files/HealthPOIs_Montgomery_VA 2.csv')
+health_POIs = read.csv('HealthPOIs_Montgomery_VA 2.csv')
 #montgomery_health_POIs = subset(health_POIs, city == "Blacksburg" | city == "Christiansburg")%>% distinct(street_address, .keep_all = TRUE)
 
 
 #Read in data
-all_data = read.csv("base_files/overall_trips_VA.csv")
+all_data = read.csv("overall_trips_VA.csv")
 overall_trips = merge(health_POIs,all_data, by.x="safegraph_place_id",by.y="safegraph_place")
 
 #We will only use the CBGs that actually appear in the dataset, just to save processing time
