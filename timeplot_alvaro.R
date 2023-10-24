@@ -36,5 +36,8 @@ for (code in unique_codes){
 
 #Plotting
 NAICS_data$date = as.Date(NAICS_data$date)
+
 NAICS_data$NAICS = as.factor(NAICS_data$NAICS)
-ggplot() + geom_line(data=NAICS_data, mapping = aes(x=date, y = num_normalized, colour = NAICS , group = NAICS)) + scale_colour_brewer(palette="Set1")
+
+ggplot() + geom_line(data=NAICS_data, mapping = aes(x=date,
+y = num_normalized, colour = NAICS , group = NAICS)) + scale_colour_brewer(palette="Set1")
