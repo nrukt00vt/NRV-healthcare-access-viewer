@@ -34,6 +34,7 @@ for (code in unique_codes){
   NAICS_data = rbind(NAICS_data, sub_data)
 }
 
+#this makes things like 622110 NAICS a variable
 #Plotting
 NAICS_data$date = as.Date(NAICS_data$date)
 NAICS_data$NAICS = as.factor(NAICS_data$NAICS)
