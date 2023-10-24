@@ -1,4 +1,3 @@
-# Hello
 library(sf)
 library(tidyverse)
 library(ggplot2)
@@ -13,15 +12,22 @@ time_data = read.csv("healthcarevisits_VA.csv")
 #remove records where nobody visited the corresponding healthcare facility
 time_data = subset(time_data, !is.na(time_data$visitor_home_cbg))
 #merge the dataset with the locations & types of the healthcare facilities
-time_data_merged = merge(time_data,health_POIs,by.x="safegraph_place",by.y="safegraph_place_id")
+time_data_merged = merge(time_data,health_POIs,
+by.x="safegraph_place",by.y="safegraph_place_id")
 
 
 #Aggregate by NAICS code; this means we will sum up all the different doctors for each NAICS code to get one result per NAICS code
-NAICS_aggregate = aggregate(time_data_merged$number , by=list(time_data_merged$date,time_data_merged$naics_code), FUN = sum)
+NAICS_aggregate = aggregate(time_data_merged$number , 
+by=list(time_data_merged$date,time_data_merged$naics_code), FUN = sum)
+
 names(NAICS_aggregate) = c("date","NAICS","num")
 
-#Here, we will normalize the values per NAICS code. If we tried to plot them without doing this, we would have some numbers way greater than others 
-#For example, the average number of people visiting NAICS 621111 (physicians) is 1-2K, whilethe average number visiting 621340 (physical/occupational/speech therapists) is more like 100
+#Here, we will normalize the values per NAICS code. 
+#If we tried to plot them without doing this, we would have some numbers way greater than others 
+
+#For example, the average number of people visiting NAICS 621111 (physicians) is 1-2K, 
+#while the average number visiting 621340 (physical/occupational/speech therapists) is more like 100
+
 #If we don't normalize, we won't be able to see the therapists numbers because the physician numbers are so high.
 
 #The way we are normalizing is by dividing each number by the median number of trips to that NAICS code; therefore the output number can be represented as "% of trips compared to median"
