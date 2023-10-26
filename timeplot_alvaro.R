@@ -63,5 +63,6 @@ y = num_normalized, colour = NAICS , group = NAICS)) + scale_colour_brewer(palet
 # A few ideas pop to mind regarding the plot as a whole
 # Could write a line of code that returns the lowest NAICS value, which "could" determine when people stopped going to each place
 # With that line of could, an inference could be determined about whether people stopped going to each place at the same time or not.
-NAICS_data_min <- NAICS_data$num_normalized
+mini <- NAICS_data$num_normalized
+
 # This is just a start ill try to figure something out for this over the week.
