@@ -16,14 +16,17 @@ overall_trips = merge(health_POIs,all_data, by.x="safegraph_place_id",by.y="safe
 shapefile_subset = subset(shapefile, is.element(GEOID, unique(overall_trips$visitor_home_cbg)))
 
 #calculate the centroid for each CBG
-centroids_cbgs = st_centroid(shapefile_subset)%>%   st_set_crs(4326)
+centroids_cbgs = st_centroid(shapefile_subset) %>% st_set_crs(4326)
 
 #Get all unique healthcare IDs; we will start to fill in a dataframe where we also fill in the average travel distance to there
 unique_healthcare_ids = unique(overall_trips$safegraph_place_id)
 
 healthcare_dist = data.frame(ID = unique_healthcare_ids, distance = 0)
 
+
+#### Healthcare facility based distance calculation
 #below this, I have written code to run the first healthcare facility; you'll want to edit and create a for loop here
+
 working_id = healthcare_dist$ID[1]
 
 #subset all trips to the healthcare facility
@@ -46,14 +49,16 @@ weighted_average_distance = sum(trips_to_healthcare_w_centroids$distances * trip
 healthcare_dist$distance[1] = weighted_average_distance
 
 
-#### Calculating distance traveled by people in each cbg
 
+#### Calculating distance traveled by people in each cbg
 #create dataset with all cbgs, which will be filled in with distances traveled by people in each CBG
 #This will use broadly the same logic, just will be focused on CBGs rather than healthcare facilities
 unique_cbg_ids = unique(overall_trips$visitor_home_cbg)
 
 cbg_dist = data.frame(ID = unique_cbg_ids, distance = 0)
-working_id = cbg_dist$ID[1]
+
+# start with the first one
+working_id = cbg_dist$ID[2]
 
 #subset all trips with the same CBG origin
 trips_fr_cbg = subset(overall_trips,visitor_home_cbg == working_id)
@@ -61,11 +66,13 @@ trips_fr_cbg = subset(overall_trips,visitor_home_cbg == working_id)
 #turn the dataset into a set of points
 trips_fr_cbg =  st_as_sf(trips_fr_cbg, coords = c("longitude","latitude"))%>% 
   st_set_crs(4326)
+
 cbg_centroid = subset(centroids_cbgs,GEOID == unique(trips_fr_cbg$visitor_home_cbg))
+
 trips_fr_cbg$distances = as.numeric(st_distance(trips_fr_cbg,cbg_centroid))
 weighted_average_distance = sum(trips_fr_cbg$distances * trips_fr_cbg$total_visitors / sum(trips_fr_cbg$total_visitors))
 
 #add this distance to the heathcare with distances traveled dataframe -- note that this is putting it in the first row because it involves the first healthcare facility;
 #as you run through the for loop, you will want to make sure it's placed in the corresponding row
-cbg_dist$distance[1] = weighted_average_distance
+cbg_dist$distance[2] = weighted_average_distance
 
