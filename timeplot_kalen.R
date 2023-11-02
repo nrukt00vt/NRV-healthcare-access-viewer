@@ -1,4 +1,4 @@
-# Hello
+
 library(sf)
 library(tidyverse)
 library(ggplot2)
@@ -10,7 +10,7 @@ health_POIs = read.csv('HealthPOIs_Montgomery_VA 2.csv')
 
 #Read in the time series data
 time_data = read.csv("healthcarevisits_VA.csv")
-#remove records where nobody visited the corresponding healthcare facility
+#remove records where nobody visited the corresponding healthcare facility (this removes the facility that says na)
 time_data = subset(time_data, !is.na(time_data$visitor_home_cbg))
 #merge the dataset with the locations & types of the healthcare facilities
 time_data_merged = merge(time_data,health_POIs,by.x="safegraph_place",by.y="safegraph_place_id")
@@ -25,7 +25,7 @@ names(NAICS_aggregate) = c("date","NAICS","num")
 #If we don't normalize, we won't be able to see the therapists numbers because the physician numbers are so high.
 
 #The way we are normalizing is by dividing each number by the median number of trips to that NAICS code; therefore the output number can be represented as "% of trips compared to median"
-#2 means 2x as many trips as median, .5 means half as many, etc.
+#2 means 2x as many trips as median, .5 means half as many, etc. (normalizing the numbers to show % of people compared to median instead of raw number of visits)
 unique_codes = unique(NAICS_aggregate$NAICS)
 NAICS_data = data.frame()
 for (code in unique_codes){
@@ -34,7 +34,12 @@ for (code in unique_codes){
   NAICS_data = rbind(NAICS_data, sub_data)
 }
 
+#this makes things like 622110 NAICS a variable
 #Plotting
 NAICS_data$date = as.Date(NAICS_data$date)
 NAICS_data$NAICS = as.factor(NAICS_data$NAICS)
 ggplot() + geom_line(data=NAICS_data, mapping = aes(x=date, y = num_normalized, colour = NAICS , group = NAICS)) + scale_colour_brewer(palette="Set1")
+
+
+#not sure if possible with given data, but could think about mapping individuals to see if one person made a trip to a healthcare facility multiple times
+#could do research and see if there were any Covid-19 spikes in the NRV area and see if it correlates with any of the spikes or drops in visits during the time period
