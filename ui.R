@@ -6,9 +6,11 @@ fluidPage(
 sidebarLayout(
   # Sidebar with a slider and selection inputs
   sidebarPanel(
-    selectInput("NAICS_selection", "Choose code:",
+    selectInput("NAICS_selection", "Choose NAICS code:",
                 choices = uniqueNAICS,
-                selected = 0)
+                selected = 0),
+    selectInput("POI_selection", "Select Individual POI: ",
+                choices = NULL),
    
   ),
   # Show Word Cloud

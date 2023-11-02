@@ -2,7 +2,7 @@
 #########
 library(sf)
 library(tidyverse)
-library(shiny)
+library(leaflet)
 ##########################
 #POI graphing Data Process
 ##########################
@@ -51,7 +51,10 @@ individual_NAICS_movement <- list()
 uniqueNAICS <- overall_trips %>% distinct(NAICS_code, .keep_all = TRUE)
 individual_NAICS_movement <- getUniqueNAICSFrames(uniqueNAICS$NAICS_code)
 
-
+shapefile$total_visitors = 0
+shapefile$location_name = 0
+shapefile$latitude = 0
+shapefile$longitude = 0
 getUniqueNAICSmaps <- function(individual_NAICS_movement){
   listofmaps <- list()
   for (i in 1:length(individual_NAICS_movement)){
@@ -61,9 +64,9 @@ getUniqueNAICSmaps <- function(individual_NAICS_movement){
         if ((length(new_map$GEOID[j]) == length(individual_NAICS_movement[[i]]$visitor_home_cbg [k])) && 
             (new_map$GEOID[j] == individual_NAICS_movement[[i]]$visitor_home_cbg [k])){
           new_map$total_visitors[j] <- (new_map$total_visitors[j] + individual_NAICS_movement[[i]]$total_visitors[k])
-          #print(j)
         }else{}
       }
+      print(paste(j, "/", length(new_map$GEOID)))
     }
     sub_dat <- individual_NAICS_movement[[i]] %>% distinct(location_name, .keep_all = TRUE)
     for (j in 1:length(sub_dat$location_name)){
@@ -84,6 +87,12 @@ domain <- subset(NAICS_movement_maps[[1]], total_visitors > 1)
 locations <- individual_NAICS_movement[[1]] %>% distinct(location_name, .keep_all = TRUE)
 print(domain$total_visitors)
 mypallet <- colorNumeric( palette="Spectral", domain=log10(domain$total_visitors), na.color='black')
+icons <- awesomeIcons(
+  icon = "ios-medkit",
+  iconColor = 'blue',
+  library = 'ion',
+  markerColor = "red"
+)
 choro <- leaflet(NAICS_movement_maps[[1]]) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(
@@ -108,3 +117,4 @@ choro <- leaflet(NAICS_movement_maps[[1]]) %>%
                      title = paste("Total Visitors (log10)", locations$NAICS_code[1]),
                      opacity = 0.5)
 choro
+
