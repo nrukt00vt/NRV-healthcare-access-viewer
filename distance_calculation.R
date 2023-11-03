@@ -28,31 +28,52 @@ healthcare_dist = data.frame(ID = unique_healthcare_ids, distance = 0)
 #below this, I have written code to run the first healthcare facility; you'll want to edit and create a for loop here
 
 working_id = healthcare_dist$ID[1]
-for (i in 1:length(ID)){
+#healthcare_dist$ID tells R to look at the ID variable inside of healthcare_dist
+for (i in 1:length(healthcare_dist$ID)){
+  
   working_id = healthcare_dist$ID[i]
+  print(working_id)
   
 }
-return(distances)
 
-#subset all trips to the healthcare facility
-trips_to_healthcare = subset(overall_trips,safegraph_place_id == working_id)
-#associate each row with the corresponding CBG centroid
-trips_to_healthcare_w_centroids = merge(trips_to_healthcare,centroids_cbgs,by.x="visitor_home_cbg",by.y="GEOID")
-trips_to_healthcare_w_centroids = st_as_sf(trips_to_healthcare_w_centroids) %>%   st_set_crs(4326)
+for (i in 1:length(healthcare_dist$ID)){
+  
+  working_id = healthcare_dist$ID[i]
+  print(working_id)
+  
+  #subset all trips to the healthcare facility
+  trips_to_healthcare = subset(overall_trips,safegraph_place_id == working_id)
+  #associate each row with the corresponding CBG centroid
+  trips_to_healthcare_w_centroids = merge(trips_to_healthcare,centroids_cbgs,by.x="visitor_home_cbg",by.y="GEOID")
+  trips_to_healthcare_w_centroids = st_as_sf(trips_to_healthcare_w_centroids) %>%   st_set_crs(4326)
+  
+  #create a point for the healthcare facility
+  healthcare_point = st_as_sf(subset(health_POIs, safegraph_place_id == working_id), coords = c("longitude","latitude"))%>% 
+    st_set_crs(4326)
+  
+  #calculate distance between healthcare facility and all the CBG centroids
+  trips_to_healthcare_w_centroids$distances = as.numeric(st_distance(healthcare_point,trips_to_healthcare_w_centroids))
+  #create a weighted average for trips to the healthcare facility
+  weighted_average_distance = sum(trips_to_healthcare_w_centroids$distances * trips_to_healthcare_w_centroids$total_visitors / sum(trips_to_healthcare_w_centroids$total_visitors))
+  
+  #add this distance to the healthcare with distances traveled dataframe -- note that this is putting it in the first row because it involves the first healthcare facility;
+  #as you run through the for loop, you will want to make sure it's placed in the corresponding row
+  healthcare_dist$distance[i] = weighted_average_distance
+  
+  
+}
 
-#create a point for the healthcare facility
-healthcare_point = st_as_sf(subset(health_POIs, safegraph_place_id == working_id), coords = c("longitude","latitude"))%>% 
+#plotting
+healthcare_dist = subset(healthcare_dist, distance > 0)
+
+hist(healthcare_dist$distance)
+health_POIs_sf = st_as_sf(health_POIs, coords = c("longitude","latitude"))%>% 
   st_set_crs(4326)
 
-#calculate distance between healthcare facility and all the CBG centroids
-trips_to_healthcare_w_centroids$distances = as.numeric(st_distance(healthcare_point,trips_to_healthcare_w_centroids))
-#create a weighted average for trips to the healthcare facility
-weighted_average_distance = sum(trips_to_healthcare_w_centroids$distances * trips_to_healthcare_w_centroids$total_visitors / sum(trips_to_healthcare_w_centroids$total_visitors))
+health_POIs_sf_dist = merge(health_POIs_sf,healthcare_dist, by.x="safegraph_place_id", by.y = "ID")
 
-#add this distance to the healthcare with distances traveled dataframe -- note that this is putting it in the first row because it involves the first healthcare facility;
-#as you run through the for loop, you will want to make sure it's placed in the corresponding row
-healthcare_dist$distance[1] = weighted_average_distance
-
+ggplot() + geom_sf(data = health_POIs_sf_dist, mapping = aes(colour = distance)) + 
+  scale_colour_distiller(palette = "YlOrRd", trans ="log10") + ylim(c(37,37.3)) + xlim(c(-81,-80))
 
 
 #### Calculating distance traveled by people in each cbg

@@ -15,13 +15,16 @@ month(ymd(dataset$date))
 unique_dates = unique(dataset$date)
 unique_combos = unique(dataset[c("safegraph_place","visitor_home_cbg")])
 unique_combos$num = 0
-start_dates = floor_date(unique_dates,'month')
-end_dates = ceiling_date(unique_dates,'month')-1
-
+start_dates = unique(floor_date(unique_dates,'month'))
+end_dates = unique(ceiling_date(unique_dates,'month')-1)
+all_data = data.frame()
 for (i in 1:length(start_dates)){
+  unique_combos = unique(dataset[c("safegraph_place","visitor_home_cbg")])
+  unique_combos$num = 0
+  unique_combos$month = start_dates[i]
   for (date in seq(start_dates[i],end_dates[i],by=1)){
     placeholder_date = date
-    print(placeholder_date)
+    #print(placeholder_date)
     while (is.element(placeholder_date, unique_dates) == F){
       print(placeholder_date)
       placeholder_date = placeholder_date + 1
@@ -41,6 +44,7 @@ for (i in 1:length(start_dates)){
       }
     }
   }
+  all_data = rbind(all_data,unique_combos)
 }
 dataset$month = month(ymd(dataset$date))
 
