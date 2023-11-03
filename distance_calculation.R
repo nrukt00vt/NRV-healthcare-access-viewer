@@ -5,7 +5,7 @@ library(tidyverse)
 shapefile = read_sf(dsn ="base_files", layer= "tl_2022_51_bg")
 #Choose HealthPOIs_Montgomery_VA.csv
 health_POIs = read.csv('HealthPOIs_Montgomery_VA 2.csv')
-#montgomery_health_POIs = subset(health_POIs, city == "Blacksburg" | city == "Christiansburg")%>% distinct(street_address, .keep_all = TRUE)
+montgomery_health_POIs = subset(health_POIs, city == "Blacksburg" | city == "Christiansburg")%>% distinct(street_address, .keep_all = TRUE)
 
 
 #Read in data
@@ -28,6 +28,11 @@ healthcare_dist = data.frame(ID = unique_healthcare_ids, distance = 0)
 #below this, I have written code to run the first healthcare facility; you'll want to edit and create a for loop here
 
 working_id = healthcare_dist$ID[1]
+for (i in 1:length(ID)){
+  working_id = healthcare_dist$ID[i]
+  
+}
+return(distances)
 
 #subset all trips to the healthcare facility
 trips_to_healthcare = subset(overall_trips,safegraph_place_id == working_id)
@@ -44,7 +49,7 @@ trips_to_healthcare_w_centroids$distances = as.numeric(st_distance(healthcare_po
 #create a weighted average for trips to the healthcare facility
 weighted_average_distance = sum(trips_to_healthcare_w_centroids$distances * trips_to_healthcare_w_centroids$total_visitors / sum(trips_to_healthcare_w_centroids$total_visitors))
 
-#add this distance to the heathcare with distances traveled dataframe -- note that this is putting it in the first row because it involves the first healthcare facility;
+#add this distance to the healthcare with distances traveled dataframe -- note that this is putting it in the first row because it involves the first healthcare facility;
 #as you run through the for loop, you will want to make sure it's placed in the corresponding row
 healthcare_dist$distance[1] = weighted_average_distance
 
