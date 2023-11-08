@@ -1,8 +1,15 @@
 
 function(input, output, session) {
 
-  subset_trips <- reactive({subset(overall_trips, naics_code == input$NAICS_selection)})#%>% distinct(location_name, .keep_all = TRUE)
-  subset_POIs <- reactive({subset(uniqueLocations, naics_code == input$NAICS_selection)})
+  #subset_trips <- reactive({subset(overall_trips, naics_code == input$NAICS_selection)})#%>% distinct(location_name, .keep_all = TRUE)
+  subset_trips <- reactive({
+    if (input$POI_selection == "All POIs"){
+      subset(overall_trips, naics_code == input$NAICS_selection)
+    } else {
+      subset(overall_trips, naics_code == input$NAICS_selection & location_name == input$POI_selection)
+    }
+  })
+  
   output$uniqueLocations <- renderDataTable({
     
     uniqueLocations <- aggregate(subset_trips()[,c("total_visitors")], by=list(subset_trips()$location_name), FUN=sum)
@@ -17,23 +24,25 @@ function(input, output, session) {
     merge(shapefile,visitor_data,by.x = "GEOID",by.y="home_cbg")
     shapefile
   })
+  #POI marker icons
   icons <- awesomeIcons(
     icon = "ios-medkit",
-    iconColor = 'blue',
+    iconColor = 'red',
     library = 'ion',
-    markerColor = "red"
+    markerColor = "blue"
   )
+  #sets up Health POI selection box to react to NAICS choice
   observe({
-    
     x <- input$NAICS_selection
     list <- subset(uniqueLocations, naics_code == x)
     list <- with(list, list[order(location_name),])
-    
+    list <- list$location_name
+    list[length(list)+1] <- "All POIs"
     updateSelectInput(session, "POI_selection",
-      choices = list$location_name,
-      selected = list$location_name[0]
+      choices = list,
+      selected = list[length(list)]
     )
-    })
+  })
 
   output$outputmap <- renderLeaflet({
     visitor_data = aggregate(subset_trips()[,c("total_visitors")],by = list(subset_trips()$visitor_home_cbg),FUN = sum)
