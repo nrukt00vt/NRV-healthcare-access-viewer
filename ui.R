@@ -11,8 +11,9 @@ sidebarLayout(
                 selected = 0),
     selectInput("POI_selection", "Select Individual POI: ",
                 choices = NULL),
-   
+    tableOutput("UI_table"),
   ),
+
   # Show Word Cloud
   mainPanel(
     leafletOutput("outputmap",height = 1000)

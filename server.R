@@ -43,7 +43,17 @@ function(input, output, session) {
       selected = list[length(list)]
     )
   })
-
+  
+  output$UI_table <- renderTable({
+    head(subset_trips()[,c("visitor_home_cbg", "total_visitors")], n = 25)},
+    digits = 0,
+    striped = TRUE,
+    hover = TRUE,
+    bordered = TRUE,
+    width = '15cm',
+    align = 'l'
+  )
+  
   output$outputmap <- renderLeaflet({
     visitor_data = aggregate(subset_trips()[,c("total_visitors")],by = list(subset_trips()$visitor_home_cbg),FUN = sum)
     names(visitor_data) = c("home_cbg","num_visitors")
