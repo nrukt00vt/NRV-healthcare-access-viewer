@@ -2,7 +2,7 @@ library(sf)
 library(tidyverse)
 
 #Read in the shapefile as an "sf" object
-shapefile = read_sf(dsn ="base_files", layer= "tl_2022_51_bg")
+shapefile = read_sf(dsn ="base_files", layer= "tl_2019_51_bg")
 #Choose HealthPOIs_Montgomery_VA.csv
 health_POIs = read.csv('HealthPOIs_Montgomery_VA 2.csv')
 montgomery_health_POIs = subset(health_POIs, city == "Blacksburg" | city == "Christiansburg")%>% distinct(street_address, .keep_all = TRUE)
@@ -101,12 +101,12 @@ for (i in 1:length(cbg_dist$ID)){
     st_set_crs(4326)
   
   cbg_centroid = subset(centroids_cbgs,GEOID == working_id)
+  if (nrow(cbg_centroid)>0){
+    trips_fr_cbg$distances = as.numeric(st_distance(trips_fr_cbg,cbg_centroid))
+    weighted_average_distance = sum(trips_fr_cbg$distances * trips_fr_cbg$total_visitors / sum(trips_fr_cbg$total_visitors))
   
-  trips_fr_cbg$distances = as.numeric(st_distance(trips_fr_cbg,cbg_centroid))
-  weighted_average_distance = sum(trips_fr_cbg$distances * trips_fr_cbg$total_visitors / sum(trips_fr_cbg$total_visitors))
-  
-  cbg_dist$distance[i] = weighted_average_distance
-  
+    cbg_dist$distance[i] = weighted_average_distance
+  }
 }
 
 
