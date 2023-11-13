@@ -9,17 +9,44 @@ function(input, output, session) {
       subset(overall_trips, naics_code == input$NAICS_selection & location_name == input$POI_selection)
     }
   })
+  subset_trips_month <- reactive({
+    #print(subset_trips())
+    month_select = floor_date(input$Month_selection,unit = "month")
+    if (input$POI_selection == "All POIs"){
+      subset(subset_trips(), month == month_select)
+    } else {
+      subset(subset_trips(), month == month_select)
+    }
+  })
   
   output$uniqueLocations <- renderDataTable({
-    
-    uniqueLocations <- aggregate(subset_trips()[,c("total_visitors")], by=list(subset_trips()$location_name), FUN=sum)
+    uniqueLocations <- aggregate(subset_trips_month()[,c("num")], by=list(subset_trips_month()$location_name), FUN=sum)
     names(uniqueLocations) = c("location_name","num_visitors")
-    merge(x=uniqueLocations,y=unique(subset_trips()[,c("location_name","safegraph_place_id","latitude","longitude")]))
+    merge(x=uniqueLocations,y=unique(subset_trips_month()[,c("location_name","safegraph_place_id","latitude","longitude")]))
     uniqueLocations
   })
   
   output$visitor_data <- renderDataTable({
-    visitor_data = aggregate(subset_trips()[,c("total_visitors")],by = list(subset_trips()$visitor_home_cbg),FUN = sum)
+    visitor_data = aggregate(subset_trips_month()[,c("num")],by = list(subset_trips_month()$visitor_home_cbg),FUN = sum)
+    names(visitor_data) = c("home_cbg","num_visitors")
+    merge(shapefile,visitor_data,by.x = "GEOID",by.y="home_cbg")
+    shapefile
+  })
+  
+  plot_dat = reactive({ 
+    plot_data = subset_trips()
+    plot_data_agg = aggregate(plot_data$num,by=list(plot_data$month), FUN = sum)
+    names(plot_data_agg) = c("month","num")
+    plot_data_agg})
+  
+  output$plot_months<-renderPlot({
+    print(plot_dat())
+    ggplot()+geom_line(data = plot_dat() , mapping = aes(x=month,y=num, group = 1)) + 
+      ggtitle(paste0(input$NAICS_selection, ", ", input$POI_selection))+
+            theme_bw(base_size=20)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))},height=500,width=800)
+
+  output$visitor_data <- renderDataTable({
+    visitor_data = aggregate(subset_trips_month()[,c("num")],by = list(subset_trips_month()$visitor_home_cbg),FUN = sum)
     names(visitor_data) = c("home_cbg","num_visitors")
     merge(shapefile,visitor_data,by.x = "GEOID",by.y="home_cbg")
     shapefile
@@ -45,7 +72,7 @@ function(input, output, session) {
   })
   
   output$UI_table <- renderTable({
-    head(subset_trips()[,c("visitor_home_cbg", "total_visitors")], n = 25)},
+    head(subset_trips_month()[,c("visitor_home_cbg", "num")], n = 25)},
     digits = 0,
     striped = TRUE,
     hover = TRUE,
@@ -55,20 +82,22 @@ function(input, output, session) {
   )
   
   output$outputmap <- renderLeaflet({
-    visitor_data = aggregate(subset_trips()[,c("total_visitors")],by = list(subset_trips()$visitor_home_cbg),FUN = sum)
+    
+    print(subset_trips_month())
+    visitor_data = aggregate(subset_trips_month()[,c("num")],by = list(subset_trips_month()$visitor_home_cbg),FUN = sum)
     names(visitor_data) = c("home_cbg","num_visitors")
     shapefile_visited = merge(shapefile,visitor_data,by.x = "GEOID",by.y="home_cbg")
 
     
-    uniqueLocations <- aggregate(subset_trips()[,c("total_visitors")], by=list(subset_trips()$location_name), FUN=sum)
+    uniqueLocations <- aggregate(subset_trips_month()[,c("num")], by=list(subset_trips_month()$location_name), FUN=sum)
     names(uniqueLocations) = c("location_name","num_visitors")
-    uniqueLocations = merge(x=uniqueLocations,y=unique(subset_trips()[,c("location_name","safegraph_place_id","latitude","longitude")]))
+    uniqueLocations = merge(x=uniqueLocations,y=unique(subset_trips_month()[,c("location_name","safegraph_place_id","latitude","longitude")]))
     
     mypallet <- colorNumeric( palette="Spectral", domain=c(0,log10(maximum_value)),na.color='black')#shapefile_visited$num_visitors), na.color='black')
     leaflet(shapefile_visited) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
       addPolygons(
-        fillColor = ~mypallet(log10(num_visitors)),
+        fillColor = ~mypallet(log10(round(num_visitors))),
         weight = 2,
         opacity = 1,
         fillOpacity = .8,
@@ -86,8 +115,8 @@ function(input, output, session) {
               zoom = 10) %>%
       leaflet::addLegend(data = shapefile_visited,
                          position = "bottomright",
-                         pal = mypallet, values = ~log10(shapefile_visited$num_visitors),
-                         title = paste("Total Visitors (log10); NAICS ", unique(subset_trips()$naics_code)),
+                         pal = mypallet, values = ~log10(round(shapefile_visited$num_visitors)),
+                         title = paste("Total Visitors (log10); NAICS ", unique(subset_trips_month()$naics_code)),
                          opacity = 0.5)
   })
 }

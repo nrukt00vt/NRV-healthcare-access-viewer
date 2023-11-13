@@ -17,13 +17,13 @@ sidebarLayout(
                 max = max(as.Date(overall_trips$month)),
                 value=as.Date("2019-12-01"),
                 timeFormat="%Y-%m"),
-    
+   
     tableOutput("UI_table"),
   ),
 
   # Show Word Cloud
   mainPanel(
-    leafletOutput("outputmap",height = 1000)
+    leafletOutput("outputmap",height = 1000), plotOutput("plot_months")
   )
 )
 )
