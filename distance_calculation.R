@@ -110,3 +110,16 @@ for (i in 1:length(cbg_dist$ID)){
 }
 
 
+#plotting
+cbg_dist = subset(cbg_dist, distance > 0)
+
+hist(cbg_dist$distance)
+centroids_cbg_sf = st_as_sf(centroids_cbgs, coords = c("longitude","latitude"))%>% 
+  st_set_crs(4326)
+centroids_cbg_sf_dist = merge(centroids_cbg_sf,cbg_dist, by.x="GEOID", by.y = "ID")
+
+
+ggplot() + geom_sf(data = centroids_cbg_sf_dist, mapping = aes(colour = distance)) + 
+  scale_colour_distiller(palette = "YlOrRd", trans ="log10") 
+
+
