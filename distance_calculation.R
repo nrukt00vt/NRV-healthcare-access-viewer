@@ -3,13 +3,15 @@ library(tidyverse)
 
 #Read in the shapefile as an "sf" object
 shapefile = read_sf(dsn ="base_files", layer= "tl_2019_51_bg")
-#Choose HealthPOIs_Montgomery_VA.csv
-health_POIs = read.csv('HealthPOIs_Montgomery_VA 2.csv')
-montgomery_health_POIs = subset(health_POIs, city == "Blacksburg" | city == "Christiansburg")%>% distinct(street_address, .keep_all = TRUE)
+#New River Health District only
+shapefile = subset(shapefile,is.element(COUNTYFP,c("063","121","155","750","071")))
+
+#We won't worry about isolating to Blacksburg and Christiansburg
+montgomery_health_POIs = read.csv('HealthPOIs_Montgomery_VA 2.csv')
 
 
 #Read in data
-all_data = read.csv("overall_trips_VA.csv")
+all_data = read.csv("NRV_monthly_data.csv")
 overall_trips = merge(health_POIs,all_data, by.x="safegraph_place_id",by.y="safegraph_place")
 
 #We will only use the CBGs that actually appear in the dataset, just to save processing time
@@ -27,7 +29,6 @@ healthcare_dist = data.frame(ID = unique_healthcare_ids, distance = 0)
 #### Healthcare facility based distance calculation
 #below this, I have written code to run the first healthcare facility; you'll want to edit and create a for loop here
 
-working_id = healthcare_dist$ID[1]
 #healthcare_dist$ID tells R to look at the ID variable inside of healthcare_dist
 for (i in 1:length(healthcare_dist$ID)){
   
