@@ -86,7 +86,7 @@ working_id = cbg_dist$ID[1]
 for (i in 1:length(cbg_dist$ID)){
   working_id = cbg_dist$ID[i]
   working_month = cbg_dist$month[i]
-  print(working_id) 
+  print(i) 
 
   trips_fr_cbg = subset(overall_trips,visitor_home_cbg == working_id& month == working_month)
   
