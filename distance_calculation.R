@@ -27,8 +27,7 @@ unique_months = unique(overall_trips$month)
 healthcare_dist = expand.grid(ID = unique_healthcare_ids, distance = 0,month = unique_months)
 
 #### Healthcare facility based distance calculation
-#below this, I have written code to run the first healthcare facility; you'll want to edit and create a for loop here
-#healthcare_dist$ID tells R to look at the ID variable inside of healthcare_dist
+#Iterates row by row; doesn't actually need nested for loops
 
 
 for (i in 1:length(healthcare_dist$ID)){
@@ -82,6 +81,7 @@ cbg_dist = expand.grid(ID = unique_cbg_ids, distance = 0,month = unique_months)
 
 # start with the first one
 working_id = cbg_dist$ID[1]
+#Iterates row by row; doesn't actually need nested for loops
 
 for (i in 1:length(cbg_dist$ID)){
   working_id = cbg_dist$ID[i]
