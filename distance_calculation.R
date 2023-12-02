@@ -3,14 +3,16 @@ library(tidyverse)
 
 #Read in the shapefile as an "sf" object
 shapefile = read_sf(dsn ="base_files", layer= "tl_2019_51_bg")
-#Choose HealthPOIs_Montgomery_VA.csv
+#New River Health District only
+shapefile = subset(shapefile,is.element(COUNTYFP,c("063","121","155","750","071")))
+
+#We won't worry about isolating to Blacksburg and Christiansburg
 health_POIs = read.csv('HealthPOIs_Montgomery_VA 2.csv')
-montgomery_health_POIs = subset(health_POIs, city == "Blacksburg" | city == "Christiansburg")%>% distinct(street_address, .keep_all = TRUE)
 
 
 #Read in data
-all_data = read.csv("overall_trips_VA.csv")
-all_data_2 = read.csv("NRV_monthly_data.csv")
+all_data = read.csv("NRV_monthly_data.csv")
+names(all_data)[which(names(all_data) == "num")] = "total_visitors"
 overall_trips = merge(health_POIs,all_data, by.x="safegraph_place_id",by.y="safegraph_place")
 
 #We will only use the CBGs that actually appear in the dataset, just to save processing time
@@ -21,29 +23,20 @@ centroids_cbgs = st_centroid(shapefile) %>% st_set_crs(4326)
 
 #Get all unique healthcare IDs; we will start to fill in a dataframe where we also fill in the average travel distance to there
 unique_healthcare_ids = unique(overall_trips$safegraph_place_id)
-
-healthcare_dist = data.frame(ID = unique_healthcare_ids, distance = 0)
-
+unique_months = unique(overall_trips$month)
+healthcare_dist = expand.grid(ID = unique_healthcare_ids, distance = 0,month = unique_months)
 
 #### Healthcare facility based distance calculation
-#below this, I have written code to run the first healthcare facility; you'll want to edit and create a for loop here
+#Iterates row by row; doesn't actually need nested for loops
 
-working_id = healthcare_dist$ID[1]
-#healthcare_dist$ID tells R to look at the ID variable inside of healthcare_dist
-for (i in 1:length(healthcare_dist$ID)){
-  
-  working_id = healthcare_dist$ID[i]
-  print(working_id)
-  
-}
 
 for (i in 1:length(healthcare_dist$ID)){
-  
+  working_month = healthcare_dist$month[i]
   working_id = healthcare_dist$ID[i]
   print(working_id)
   
   #subset all trips to the healthcare facility
-  trips_to_healthcare = subset(overall_trips,safegraph_place_id == working_id)
+  trips_to_healthcare = subset(overall_trips,safegraph_place_id == working_id & month == working_month)
   #associate each row with the corresponding CBG centroid
   trips_to_healthcare_w_centroids = merge(trips_to_healthcare,centroids_cbgs,by.x="visitor_home_cbg",by.y="GEOID")
   trips_to_healthcare_w_centroids = st_as_sf(trips_to_healthcare_w_centroids) %>%   st_set_crs(4326)
@@ -64,6 +57,8 @@ for (i in 1:length(healthcare_dist$ID)){
   
 }
 
+
+
 #plotting
 healthcare_dist = subset(healthcare_dist, distance > 0)
 
@@ -82,21 +77,18 @@ ggplot() + geom_sf(data = health_POIs_sf_dist, mapping = aes(colour = distance))
 #This will use broadly the same logic, just will be focused on CBGs rather than healthcare facilities
 unique_cbg_ids = unique(overall_trips$visitor_home_cbg)
 
-cbg_dist = data.frame(ID = unique_cbg_ids, distance = 0)
+cbg_dist = expand.grid(ID = unique_cbg_ids, distance = 0,month = unique_months)
 
 # start with the first one
 working_id = cbg_dist$ID[1]
+#Iterates row by row; doesn't actually need nested for loops
 
 for (i in 1:length(cbg_dist$ID)){
   working_id = cbg_dist$ID[i]
-  print(working_id)
-}
+  working_month = cbg_dist$month[i]
+  print(i) 
 
-for (i in 1:length(cbg_dist$ID)){
-  working_id = cbg_dist$ID[i]
-  print(working_id) 
-
-  trips_fr_cbg = subset(overall_trips,visitor_home_cbg == working_id)
+  trips_fr_cbg = subset(overall_trips,visitor_home_cbg == working_id& month == working_month)
   
   trips_fr_cbg =  st_as_sf(trips_fr_cbg, coords = c("longitude","latitude"))%>% 
     st_set_crs(4326)
