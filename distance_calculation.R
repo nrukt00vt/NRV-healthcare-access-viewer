@@ -10,6 +10,7 @@ montgomery_health_POIs = subset(health_POIs, city == "Blacksburg" | city == "Chr
 
 #Read in data
 all_data = read.csv("overall_trips_VA.csv")
+all_data_2 = read.csv("NRV_monthly_data.csv")
 overall_trips = merge(health_POIs,all_data, by.x="safegraph_place_id",by.y="safegraph_place")
 
 #We will only use the CBGs that actually appear in the dataset, just to save processing time
