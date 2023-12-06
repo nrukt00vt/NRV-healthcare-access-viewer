@@ -18,7 +18,6 @@ function(input, output, session) {
       subset(subset_trips(), month == month_select)
     }
   })
-  
   output$uniqueLocations <- renderDataTable({
     uniqueLocations <- aggregate(subset_trips_month()[,c("num")], by=list(subset_trips_month()$location_name), FUN=sum)
     names(uniqueLocations) = c("location_name","num_visitors")
@@ -43,7 +42,7 @@ function(input, output, session) {
     print(plot_dat())
     ggplot()+geom_line(data = plot_dat() , mapping = aes(x=month,y=num, group = 1)) + 
       ggtitle(paste0(input$NAICS_selection, ", ", input$POI_selection))+
-            theme_bw(base_size=20)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))},height=500,width=800)
+            theme_bw(base_size=20)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))},height=500,width=500)
 
   output$visitor_data <- renderDataTable({
     visitor_data = aggregate(subset_trips_month()[,c("num")],by = list(subset_trips_month()$visitor_home_cbg),FUN = sum)
@@ -70,16 +69,6 @@ function(input, output, session) {
       selected = list[length(list)]
     )
   })
-  
-  output$UI_table <- renderTable({
-    head(subset_trips_month()[,c("visitor_home_cbg", "num")], n = 25)},
-    digits = 0,
-    striped = TRUE,
-    hover = TRUE,
-    bordered = TRUE,
-    width = '15cm',
-    align = 'l'
-  )
   
   output$outputmap <- renderLeaflet({
     
