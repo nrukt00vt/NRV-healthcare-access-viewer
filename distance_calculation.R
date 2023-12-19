@@ -65,11 +65,13 @@ healthcare_dist = subset(healthcare_dist, distance > 0)
 hist(healthcare_dist$distance)
 health_POIs_sf = st_as_sf(health_POIs, coords = c("longitude","latitude"))%>% 
   st_set_crs(4326)
-
+healthcare_dist = subset(healthcare_dist, month == "2019-07-01")
 health_POIs_sf_dist = merge(health_POIs_sf,healthcare_dist, by.x="safegraph_place_id", by.y = "ID")
-
-ggplot() + geom_sf(data = health_POIs_sf_dist, mapping = aes(colour = distance)) + 
-  scale_colour_distiller(palette = "YlOrRd", trans ="log10") + ylim(c(37,37.3)) + xlim(c(-81,-80))
+health_POIs_sf_dist = health_POIs_sf_dist[order(health_POIs_sf_dist$distance,decreasing=T),]
+health_POIs_sf_dist = subset(health_POIs_sf_dist,distance < 40000)
+ggplot() + geom_sf(data = shapefile) +
+  geom_sf(data = health_POIs_sf_dist, mapping = aes(colour = distance)) + 
+  scale_colour_distiller(palette = "YlOrRd",trans="log10",direction = 1) + ylim(c(37,37.3)) + xlim(c(-81,-80))
 
 
 #### Calculating distance traveled by people in each cbg
