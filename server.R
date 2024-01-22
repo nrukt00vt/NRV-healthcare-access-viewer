@@ -4,9 +4,14 @@ function(input, output, session) {
   #subset_trips <- reactive({subset(overall_trips, naics_code == input$NAICS_selection)})#%>% distinct(location_name, .keep_all = TRUE)
   subset_trips <- reactive({
     if (input$POI_selection == "All POIs"){
-      subset(overall_trips, naics_code == input$NAICS_selection)
+      subset(overall_trips, naics_code == NAICSTranslator %>%
+                                          filter(Name == input$NAICS_selection) %>%
+                                          pull(Code))
     } else {
-      subset(overall_trips, naics_code == input$NAICS_selection & location_name == input$POI_selection)
+      subset(overall_trips, naics_code == NAICSTranslator %>%
+                                          filter(Name == input$NAICS_selection) %>% 
+                                          pull(Code) &
+                                          location_name == input$POI_selection)
     }
   })
   subset_trips_month <- reactive({
@@ -59,7 +64,9 @@ function(input, output, session) {
   )
   #sets up Health POI selection box to react to NAICS choice
   observe({
-    x <- input$NAICS_selection
+    x <- NAICSTranslator %>%
+      filter(Name == input$NAICS_selection) %>% 
+      pull(Code)
     list <- subset(uniqueLocations, naics_code == x)
     list <- with(list, list[order(location_name),])
     list <- list$location_name

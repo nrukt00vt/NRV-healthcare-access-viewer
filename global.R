@@ -17,4 +17,10 @@ overall_trips = merge(health_POIs,all_data, by.x="safegraph_place_id",by.y="safe
 uniqueLocations <- overall_trips %>% distinct(safegraph_place_id, .keep_all = TRUE)
 uniqueNAICS = unique(uniqueLocations$naics_code)
 maximum_value = max(aggregate(overall_trips[,c("num")],by = list(overall_trips$visitor_home_cbg, overall_trips$naics_code, overall_trips$month),FUN = sum)$x)
+NAICSTranslator <- data.frame(Code = uniqueNAICS,
+                              Name = c("Offices of Dentists",
+                                       "Physical, Occupational, and Speech Therapists",
+                                       "Offices of Physicians",
+                                       "Ambulatory, Surgical, and Emergency Centers",
+                                       "General Medical and Surgical Hospitals"))
 print("done prep")
