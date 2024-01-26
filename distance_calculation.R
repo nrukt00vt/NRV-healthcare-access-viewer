@@ -90,7 +90,7 @@ for (i in 1:length(cbg_dist$ID)){
   working_month = cbg_dist$month[i]
   print(i) 
   
-  trips_fr_cbg = subset(overall_trips,visitor_home_cbg == working_id& month == working_month)
+  trips_fr_cbg = subset(overall_trips,visitor_home_cbg == working_id & month == working_month)
   
   trips_fr_cbg =  st_as_sf(trips_fr_cbg, coords = c("longitude","latitude"))%>% 
     st_set_crs(4326)
@@ -135,3 +135,22 @@ dist_plot = ggplot() +geom_sf(data = shapefile, fill = "light grey", colour = "d
 ggsave(dist_plot, filename = paste0("distance_plot",months[i],".png"))
 }
 
+cbg_number_visits = aggregate(overall_trips$total_visitors, by = list(overall_trips$visitor_home_cbg,
+                                                                      overall_trips$month),
+                              FUN = sum)
+names(cbg_number_visits) = c("home_cbg", "month", "total_visitors")
+cbg_number_visits = subset(cbg_number_visits, total_visitors > 0)
+
+cbg_feb_2020 = subset(cbg_number_visits, month == "2020-02-01")
+
+# Merge Feb 2020 data, using home cbg, back into cbg_number_visits, so that we have the feb 2020 total visitor numbers to compare each month's numbers against
+# The ratio we will plot is the total visitors / feb 2020 visitors 
+# This will require renaming the feb 2020 data (rename total_visitors in this dataset), and using the "merge" function
+
+names(cbg_feb_2020)[which(names(cbg_feb_2020) == "total_visitors")] = "feb_2020_visitors"
+
+cbg_number_visits = merge(cbg_number_visits, cbg_feb_2020, by = list(overall_trips$visitor_home_cbg, month))
+
+cbg_number_visits$ratio_to_feb_2020 = cbg_number_visits$total_visitors / cbg_number_visits$feb_2020_visitors
+
+#Then, subset each month using subset function, merge it with the shapefile, and plot the shapefile (similar to the above code) for each month
