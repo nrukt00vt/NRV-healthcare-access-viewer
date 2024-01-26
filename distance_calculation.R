@@ -148,9 +148,20 @@ cbg_feb_2020 = subset(cbg_number_visits, month == "2020-02-01")
 # This will require renaming the feb 2020 data (rename total_visitors in this dataset), and using the "merge" function
 
 names(cbg_feb_2020)[which(names(cbg_feb_2020) == "total_visitors")] = "feb_2020_visitors"
-
-cbg_number_visits = merge(cbg_number_visits, cbg_feb_2020, by = list(overall_trips$visitor_home_cbg, month))
+cbg_feb_2020 = subset(cbg_feb_2020, select = -c(month))
+cbg_number_visits = merge(cbg_number_visits, cbg_feb_2020, by = c("home_cbg"))
 
 cbg_number_visits$ratio_to_feb_2020 = cbg_number_visits$total_visitors / cbg_number_visits$feb_2020_visitors
 
-#Then, subset each month using subset function, merge it with the shapefile, and plot the shapefile (similar to the above code) for each month
+`#Then, subset each month using subset function, merge it with the shapefile, and plot the shapefile (similar to the above code) for each month
+
+unique_months = unique(cbg_number_visits$month)
+
+month_select = unique_months[11]
+
+cbg_number_visits_subset = subset(cbg_number_visits, month == month_select)
+shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
+
+ggplot() + geom_sf(shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020))+
+  scale_fill_gradient2(midpoint = 1, high ="#d73027", mid = "#ffffff", low = "#4575b4") +
+  ggtitle(month_select)
