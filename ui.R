@@ -7,7 +7,7 @@ sidebarLayout(
   # Sidebar with a slider and selection inputs
   sidebarPanel(
     selectInput("NAICS_selection", "Choose NAICS code:",
-                choices = uniqueNAICS,
+                choices = NAICSTranslator$Name,
                 selected = 0),
     selectInput("POI_selection", "Select Individual POI: ",
                 choices = NULL),
