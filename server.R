@@ -46,7 +46,8 @@ function(input, output, session) {
   output$plot_months<-renderPlot({
     print(plot_dat())
     ggplot()+geom_line(data = plot_dat() , mapping = aes(x=month,y=num, group = 1)) + 
-      ggtitle(paste0(input$NAICS_selection, ", ", input$POI_selection))+
+      ggtitle(paste0(input$NAICS_selection, ", ", input$POI_selection))+ scale_x_continuous(name = "")+
+      scale_y_continuous(name = "# Visitors")+
             theme_bw(base_size=20)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))},height=500,width=500)
 
   output$visitor_data <- renderDataTable({
