@@ -165,3 +165,25 @@ shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID
 ggplot() + geom_sf(shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020))+
   scale_fill_gradient2(midpoint = 1, high ="#d73027", mid = "#ffffff", low = "#4575b4") +
   ggtitle(month_select)
+
+
+# plotting shapefile with visitors data for each month
+
+plot_shapefile_with_visitors = function(month, shapefile, cbg_number_visits) {
+ 
+  cbg_number_visits_subset  subset(cbg_number_visits, month == month)
+  shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
+  
+  plot = ggplot() +
+    geom_sf(data = shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020)) +
+    scale_fill_gradient2(midpoint = 1, high = "#d73027", mid = "#ffffff", low = "#4575b4") +
+    ggtitle(month)
+  
+  return(plot)
+}
+
+for (month_select in unique_months) {
+  plot = plot_shapefile_with_visitors(month_select, shapefile, cbg_number_visits)
+  ggsave(plot, filename = paste0("shapefile_with_visitors_", month_select, ".png"))
+}
+
