@@ -157,7 +157,7 @@ cbg_number_visits$ratio_to_feb_2020 = cbg_number_visits$total_visitors / cbg_num
 
 unique_months = unique(cbg_number_visits$month)
 
-month_select = unique_months[11]
+month_select = unique_months[1]
 
 cbg_number_visits_subset = subset(cbg_number_visits, month == month_select)
 shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
@@ -166,24 +166,25 @@ ggplot() + geom_sf(shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020
   scale_fill_gradient2(midpoint = 1, high ="#d73027", mid = "#ffffff", low = "#4575b4") +
   ggtitle(month_select)
 
+# plotting shapefile with visitor data for each month
 
-# plotting shapefile with visitors data for each month
-
-plot_shapefile_with_visitors = function(month, shapefile, cbg_number_visits) {
+plot_shapefile_with_visitors = function(month_chosen, shapefile, cbg_number_visits) {
  
-  cbg_number_visits_subset  subset(cbg_number_visits, month == month)
+  cbg_number_visits_subset = subset(cbg_number_visits, month == month_chosen)
   shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
   
-  plot = ggplot() +
-    geom_sf(data = shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020)) +
-    scale_fill_gradient2(midpoint = 1, high = "#d73027", mid = "#ffffff", low = "#4575b4") +
-    ggtitle(month)
+   plot_with_visitors = ggplot() + geom_sf(data = shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020)) +
+    scale_fill_gradient2(midpoint = 1, high = "#d73027", mid = "#ffffff", low = "#4575b4") + theme_minimal(base_size = 8)+ theme(legend.position="bottom")+
+    ggtitle(month_chosen)
   
-  return(plot)
+  return(plot_with_visitors)
 }
+month_select_2 = unique_months[1]
 
+plot_shapefile_with_visitors(month_select_2, shapefile, cbg_number_visits)
 for (month_select in unique_months) {
+  print(month_select)
   plot = plot_shapefile_with_visitors(month_select, shapefile, cbg_number_visits)
-  ggsave(plot, filename = paste0("shapefile_with_visitors_", month_select, ".png"))
+  ggsave(plot, filename = paste0("shapefile_with_visitors_", month_select, ".png"), height = 6, width = 5)
 }
 
