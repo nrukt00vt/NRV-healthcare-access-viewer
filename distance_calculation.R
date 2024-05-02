@@ -188,3 +188,19 @@ for (month_select in unique_months) {
   ggsave(plot, filename = paste0("shapefile_with_visitors_", month_select, ".png"), height = 6, width = 5)
 }
 
+
+create_shapefile_with_visitors = function(month_chosen, shapefile, cbg_number_visits) {
+  
+  cbg_number_visits_subset = subset(cbg_number_visits, month == month_chosen)
+  shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
+return(shapefile_with_visits)
+}
+shapefile_aug_2020 = create_shapefile_with_visitors("2020-08-01",shapefile,cbg_number_visits)
+#Merge the NRHD_covariates with the shapefile
+
+merged_data <- merge(shapefile_aug_2020, NRHDcovariate, by.x = "GEOID", by.y = "ct2021", all = TRUE)
+
+merged_data_no_na = subset(merged_data, !is.na(merged_data$ratio_to_feb_2020))
+#change out predictors with predcitors from NRHD_covariates
+
+lm(merged_data$ratio_to_feb_2020 ~ merged_data$prop_urban)
