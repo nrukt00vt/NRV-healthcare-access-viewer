@@ -41,8 +41,12 @@ for (i in 1:nrow(POI_trips_sub)) {
   distances$Distance[i] <- route$distance
 }
 
-# View the calculated distances
 View(distances)
+
+write.csv(distances, "distances_results.csv")
+
+distances <- read.csv("distances_results.csv")
+
 
 
 
