@@ -15,18 +15,18 @@ route = osrmRoute(src = #this should be the lat and then lon of the cbg
                   dst = c(pois[1], pois[2]), osrm.profile = "car")
 
 
-cbgs <- c(POI_trips_sub$cbg_lon[1], POI_trips_sub$cbg_lat[1])  
-pois <- c(POI_trips_sub$POI_lon[1], POI_trips_sub$POI_lat[1]) 
+cbgs = c(POI_trips_sub$cbg_lon[1], POI_trips_sub$cbg_lat[1])  
+pois = c(POI_trips_sub$POI_lon[1], POI_trips_sub$POI_lat[1]) 
 
 print(cbgs) 
 print(pois)
 
 
-route <- osrmRoute(src = cbgs, dst = pois, osrm.profile = "car")
+route = osrmRoute(src = cbgs, dst = pois, osrm.profile = "car")
 
 print(route$distance)
 
-distances <- data.frame(
+distances = data.frame(
   CBG_Lon = POI_trips_sub$cbg_lon,
   CBG_Lat = POI_trips_sub$cbg_lat,
   POI_Lon = POI_trips_sub$POI_lon,
@@ -35,19 +35,14 @@ distances <- data.frame(
 )
 
 for (i in 1:nrow(POI_trips_sub)) {
-  cbgs <- c(POI_trips_sub$cbg_lon[i], POI_trips_sub$cbg_lat[i])
-  pois <- c(POI_trips_sub$POI_lon[i], POI_trips_sub$POI_lat[i])
-  route <- osrmRoute(src = cbgs, dst = pois, osrm.profile = "car")
-  distances$Distance[i] <- route$distance
+  cbgs = c(POI_trips_sub$cbg_lon[i], POI_trips_sub$cbg_lat[i])
+  pois = c(POI_trips_sub$POI_lon[i], POI_trips_sub$POI_lat[i])
+  route = osrmRoute(src = cbgs, dst = pois, osrm.profile = "car")
+  distances$Distance[i] = route$distance
 }
 
 View(distances)
 
 write.csv(distances, "distances_results.csv")
 
-distances <- read.csv("distances_results.csv")
-
-
-
-
-
+distances = read.csv("distances_results.csv")
