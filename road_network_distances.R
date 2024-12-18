@@ -88,3 +88,69 @@ View(distances)
 
 # Saving final data for visualization or analysis
 write.csv(distances, "final_results_with_distances.csv", row.names = FALSE)
+
+
+
+# Removing duplicates in the original data frames
+POI_trips_sub = POI_trips_sub %>% distinct(cbg_lon, cbg_lat, POI_lon, POI_lat, .keep_all = TRUE)
+distances = distances %>% distinct(cbg_lon, cbg_lat, POI_lon, POI_lat, .keep_all = TRUE)
+
+# Merging data frames
+new_merged_data = POI_trips_sub %>%
+  inner_join(distances, by = c("cbg_lon", "cbg_lat", "POI_lon", "POI_lat"))
+
+# Removing any remaining duplicates after merging
+newly_merged_data = new_merged_data %>% distinct()
+
+# Viewing merged data
+View(new_merged_data)
+
+
+library(ggplot2)
+# Creating the histogram
+ggplot(new_merged_data, aes(x = Distance, weight = number)) +
+  geom_histogram(binwidth = 1, fill = "green", color = "orange", alpha = 0.5) +
+  labs(
+    title = "Histogram of Distances",
+    x = "Distance",
+    y = "Visitor Numbers"
+  ) +
+  theme_minimal()
+
+
+library(dplyr)
+library(lubridate)
+
+# Ensuring the 'date' column is in Date format
+new_merged_data$date = as.Date(new_merged_data$date, format = "%Y-%m-%d")
+
+# Filtering data for the specified date range
+filtered_data = new_merged_data %>%
+  filter(date >= as.Date("2019-01-07") & date <= as.Date("2020-11-30"))
+
+# Extracting the year-month combination
+filtered_data = filtered_data %>%
+  mutate(month = floor_date(date, "month")) # Adds a 'month' column
+
+# Summarizing data by month
+monthly_summary = filtered_data %>%
+  group_by(month) %>%
+  summarize(
+    avg_distance = mean(Distance, na.rm = TRUE),  # Average distance traveled
+    total_visitors = sum(number, na.rm = TRUE),   # Total visitors
+    count = n()                                   # Total records
+  )
+
+
+# Plotting average distance over months
+ggplot(monthly_summary, aes(x = month)) +
+  geom_line(aes(y = avg_distance), color = "blue", size = 1) +
+  geom_line(aes(y = total_visitors / 1000), color = "red", size = 1, linetype = "dashed") +
+  labs(title = "Monthly Analysis of Visitor Numbers and Distances",
+       x = "Months",
+       y = "Values",
+       subtitle = "Blue = Avg Distance | Red = Total Visitors (in 1000s)") +
+  theme_minimal()
+
+
+
