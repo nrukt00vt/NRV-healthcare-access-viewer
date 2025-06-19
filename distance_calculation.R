@@ -2,6 +2,8 @@ library(sf)
 library(tidyverse)
 
 #Read in the shapefile as an "sf" object
+
+shapefile = read_sf(dsn ="~/Downloads/tl_2019_51_bg", layer= "tl_2019_51_bg")
 shapefile = read_sf(dsn ="base_files", layer= "tl_2019_51_bg")
 #New River Health District only
 shapefile = subset(shapefile,is.element(COUNTYFP,c("063","121","155","750","071")))

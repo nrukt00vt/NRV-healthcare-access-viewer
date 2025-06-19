@@ -11,7 +11,7 @@ library(tmaptools)
 
 
 # Loading or processing POI and trips data
-if (!file.exists("trips_with_CBG_centroids.csv")) {
+if (!file.exists("trips_with_CBG_centroids.csv")) 
   # Loading raw POI and trips data
   POI_names = fread("HealthPOIs_Montgomery_VA 2.csv") %>% 
     rename(safegraph_place = safegraph_place_id)
@@ -61,14 +61,15 @@ if (!file.exists("trips_with_CBG_centroids.csv")) {
 # Calculating distances
 if (!file.exists("distances_results.csv")) {
   distances = data.frame(
-    CBG_Lon = POI_trips_sub$cbg_lon,
-    CBG_Lat = POI_trips_sub$cbg_lat,
-    POI_Lon = POI_trips_sub$POI_lon,
-    POI_Lat = POI_trips_sub$POI_lat,
+    cbg_lon = POI_trips_sub$cbg_lon,
+    cbg_lat = POI_trips_sub$cbg_lat,
+    POI_lon = POI_trips_sub$POI_lon,
+    POI_lat = POI_trips_sub$POI_lat,
     Distance = NA
   )
   
   for (i in 1:nrow(POI_trips_sub)) {
+    if (i %% 100 == 0) { print(i)}
     cbgs = c(POI_trips_sub$cbg_lon[i], POI_trips_sub$cbg_lat[i])
     pois = c(POI_trips_sub$POI_lon[i], POI_trips_sub$POI_lat[i])
     route = tryCatch(
@@ -118,6 +119,19 @@ ggplot(new_merged_data, aes(x = Distance, weight = number)) +
   theme_minimal()
 
 
+new_merged_data$prepost = "post"
+new_merged_data$prepost[new_merged_data$date<= as.Date("2020-3-15")] = "pre"
+
+# Creating the histogram
+ggplot(new_merged_data, aes(x = Distance, weight = number, fill = prepost)) +
+  geom_histogram(binwidth = 1, alpha = 1, position = "dodge") +
+  labs(
+    title = "Histogram of Distances",
+    x = "Distance",
+    y = "Visitor Numbers"
+  ) +
+  theme_minimal()
+
 library(dplyr)
 library(lubridate)
 
@@ -126,12 +140,20 @@ new_merged_data$date = as.Date(new_merged_data$date, format = "%Y-%m-%d")
 
 # Filtering data for the specified date range
 filtered_data = new_merged_data %>%
-  filter(date >= as.Date("2019-01-07") & date <= as.Date("2020-11-30"))
+  filter(date >= as.Date("2019-01-01") & date <= as.Date("2021-01-01"))
 
 # Extracting the year-month combination
-filtered_data = filtered_data %>%
-  mutate(month = floor_date(date, "month")) # Adds a 'month' column
-
+filtered_data$month =  month(filtered_data$date)
+library(gridExtra)
+ggplot(filtered_data, aes(x = Distance, weight = number,colour = month, group = month)) +
+  scale_color_distiller(palette="Spectral")+
+  geom_density( alpha = 1) +
+  labs(
+    title = "Histogram of Distances",
+    x = "Distance",
+    y = "Visitor Numbers"
+  ) +
+  theme_minimal()
 # Summarizing data by month
 monthly_summary = filtered_data %>%
   group_by(month) %>%

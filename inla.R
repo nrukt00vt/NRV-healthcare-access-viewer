@@ -1,7 +1,6 @@
 install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE) 
 #install.packages("corrplot")
 library(corrplot)
-library(rgdal)
 library(sp)
 library(INLA)
 library(spdep)
