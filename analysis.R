@@ -19,6 +19,8 @@ montgomery_health_POIs2 <- montgomery_health_POIs1 %>% distinct(street_address, 
 all_data = read.csv("overall_trips_VA.csv")
 locations_with_data = merge(montgomery_health_POIs2,all_data, by.x="safegraph_place_id",by.y="safegraph_place")
 
+
+
 uniqueNAICS = unique(uniqueLocations$naics_code)
 
 overall_trips = locations_with_data
