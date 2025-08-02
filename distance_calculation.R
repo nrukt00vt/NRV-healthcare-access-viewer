@@ -3,7 +3,7 @@ library(tidyverse)
 
 #Read in the shapefile as an "sf" object
 
-shapefile = read_sf(dsn ="~/Downloads/tl_2019_51_bg", layer= "tl_2019_51_bg")
+shapefile = read_sf(dsn ="D:/Downloads/tl_2019_51_bg", layer= "tl_2019_51_bg")
 shapefile = read_sf(dsn ="base_files", layer= "tl_2019_51_bg")
 #New River Health District only
 shapefile = subset(shapefile,is.element(COUNTYFP,c("063","121","155","750","071")))
@@ -81,16 +81,21 @@ ggplot() + geom_sf(data = shapefile) +
 #This will use broadly the same logic, just will be focused on CBGs rather than healthcare facilities
 unique_cbg_ids = unique(overall_trips$visitor_home_cbg)
 
-cbg_dist = expand.grid(ID = unique_cbg_ids, distance = 0,num_visitors = 0,month = unique_months)
+cbg_dist = expand.grid(ID = unique_cbg_ids, distance = 0,avg_visitors = 0,month = unique_months)
 
 # start with the first one
 working_id = cbg_dist$ID[1]
 #Iterates row by row; doesn't actually need nested for loops
+all_trips = aggregate(overall_trips$total_visitors, by = list(overall_trips$visitor_home_cbg, overall_trips$month), FUN = sum)
+names(all_trips) = c("cbg","month","trips")
+#all_trips = subset(all_trips, trips > 0)
+all_trips2 = aggregate(all_trips$trips, by = list(all_trips$cbg), FUN = mean)
+names(all_trips2) = c("cbg","trips")
 
 for (i in 1:length(cbg_dist$ID)){
   working_id = cbg_dist$ID[i]
   working_month = cbg_dist$month[i]
-  print(i) 
+
   
   trips_fr_cbg = subset(overall_trips,visitor_home_cbg == working_id & month == working_month)
   
@@ -99,9 +104,15 @@ for (i in 1:length(cbg_dist$ID)){
   
   cbg_centroid = subset(centroids_cbgs,GEOID == working_id)
   if (nrow(cbg_centroid)>0){
+    print(i)
     trips_fr_cbg$distances = as.numeric(st_distance(trips_fr_cbg,cbg_centroid))
     weighted_average_distance = sum(trips_fr_cbg$distances * trips_fr_cbg$total_visitors / sum(trips_fr_cbg$total_visitors))
-    cbg_dist$num_visitors[i] = sum( trips_fr_cbg$total_visitors )
+    if (sum( trips_fr_cbg$total_visitors )>0){
+      cbg_dist$avg_visitors[i] = sum( trips_fr_cbg$total_visitors ) /all_trips2[which(all_trips2$cbg == working_id),]$trips
+    }
+    if (sum( trips_fr_cbg$total_visitors ) == 0) {
+    cbg_dist$avg_visitors[i] = sum( trips_fr_cbg$total_visitors )
+    }
     cbg_dist$distance[i] = weighted_average_distance
   }
 }
@@ -122,12 +133,17 @@ for (i in 1:length(months)){
   
 centroids_cbg_sf_dist_sub = subset(centroids_cbg_sf_dist, month == months[i])
 
+num_visitors = aggregate(centroids_cbg_sf_dist$num_visitors,
+                                  by = list(centroids_cbg_sf_dist$GEOID),
+                                  FUN = sum)
+names(num_visitors) = c("GEOID","num_visitors")
 average_dist_traveled = aggregate(centroids_cbg_sf_dist$distance,
                                   by = list(centroids_cbg_sf_dist$GEOID),
                                   FUN = mean)
 names(average_dist_traveled) = c("GEOID","avg_dist")
 
 centroids_cbg_sf_dist = merge(centroids_cbg_sf_dist,average_dist_traveled)
+centroids_cbg_sf_dist= merge(centroids_cbg_sf_dist,num_visitors)
 centroids_cbg_sf_dist$distance_prop = centroids_cbg_sf_dist$distance / centroids_cbg_sf_dist$avg_dist
 centroids_cbg_sf_dist_sub = subset(centroids_cbg_sf_dist, month == months[i])
 centroids_cbg_sf_dist_sub = centroids_cbg_sf_dist_sub[order(centroids_cbg_sf_dist_sub$distance_prop, decreasing = F),]
