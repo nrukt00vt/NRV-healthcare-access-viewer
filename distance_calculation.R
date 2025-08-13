@@ -129,30 +129,70 @@ months = as.Date(unique(centroids_cbg_sf_dist$month))
 library(lubridate)
 months = months[year(months) == 2020]
 centroids_cbg_sf_dist$month = as.Date(centroids_cbg_sf_dist$month)
-for (i in 1:length(months)){
-  
-centroids_cbg_sf_dist_sub = subset(centroids_cbg_sf_dist, month == months[i])
 
-num_visitors = aggregate(centroids_cbg_sf_dist$num_visitors,
-                                  by = list(centroids_cbg_sf_dist$GEOID),
-                                  FUN = sum)
-names(num_visitors) = c("GEOID","num_visitors")
-average_dist_traveled = aggregate(centroids_cbg_sf_dist$distance,
+  
+
+num_visitors = aggregate(centroids_cbg_sf_dist$avg_visitors,
+                                  by = list(centroids_cbg_sf_dist$GEOID, 
+                                            centroids_cbg_sf_dist$month),
+                                  FUN = mean)
+names(num_visitors) = c("GEOID","month","num_visitors")
+average_dist_traveled_all = aggregate(centroids_cbg_sf_dist$distance,
                                   by = list(centroids_cbg_sf_dist$GEOID),
                                   FUN = mean)
-names(average_dist_traveled) = c("GEOID","avg_dist")
+names(average_dist_traveled_all) = c("GEOID","avg_dist_all")
+average_dist_traveled = aggregate(centroids_cbg_sf_dist$distance,
+                                  by = list(centroids_cbg_sf_dist$GEOID,
+                                            centroids_cbg_sf_dist$month),
+                                  FUN = mean)
+names(average_dist_traveled) = c("GEOID","month","avg_dist")
+average_dist_traveled = merge(average_dist_traveled,average_dist_traveled_all)
+average_dist_traveled$distance_prop = average_dist_traveled$avg_dist / average_dist_traveled$avg_dist_all
+centroids_cbg_sf_dist$pasteid = paste(centroids_cbg_sf_dist$GEOID,centroids_cbg_sf_dist$month)
+average_dist_traveled$pasteid = paste(average_dist_traveled$GEOID,average_dist_traveled$month)
+num_visitors$pasteid = paste(num_visitors$GEOID,num_visitors$month)
+centroids_cbg_sf_dist2 = merge(centroids_cbg_sf_dist,average_dist_traveled)
+centroids_cbg_sf_dist2= merge(centroids_cbg_sf_dist2,num_visitors)
+centroids_cbg_sf_dist2 = centroids_cbg_sf_dist2[order(centroids_cbg_sf_dist2$distance_prop, decreasing = F),]
 
-centroids_cbg_sf_dist = merge(centroids_cbg_sf_dist,average_dist_traveled)
-centroids_cbg_sf_dist= merge(centroids_cbg_sf_dist,num_visitors)
-centroids_cbg_sf_dist$distance_prop = centroids_cbg_sf_dist$distance / centroids_cbg_sf_dist$avg_dist
-centroids_cbg_sf_dist_sub = subset(centroids_cbg_sf_dist, month == months[i])
-centroids_cbg_sf_dist_sub = centroids_cbg_sf_dist_sub[order(centroids_cbg_sf_dist_sub$distance_prop, decreasing = F),]
-shapefile_with_dist = merge(shapefile, st_drop_geometry(centroids_cbg_sf_dist_sub),by="GEOID")
-dist_plot = ggplot() +geom_sf(data = shapefile_with_dist, colour = "light grey",mapping = aes(fill = distance_prop)) + 
-  scale_fill_gradient2(low="blue",high ="red",mid = "white",midpoint = 1) + ggtitle(months[i])
-ggsave(dist_plot, filename = paste0("distance_plot",months[i],".png"))
+#entroids_cbg_sf_dist_sub$avg_visitors[centroids_cbg_sf_dist_sub$avg_visitors == 0] = NA
+shapefile_with_dist = merge(shapefile, st_drop_geometry(centroids_cbg_sf_dist2),by="GEOID")
+shapefile_with_dist_long <- shapefile_with_dist %>%
+       pivot_longer(
+             cols = c(avg_visitors, distance_prop),
+             names_to = "metric",
+             values_to = "value"
+        )
+
+shapefile_with_dist_long$value2 = shapefile_with_dist_long$value
+shapefile_with_dist_long$value2[shapefile_with_dist_long$value2>1.3] = 1.3
+shapefile_with_dist_long$value2[shapefile_with_dist_long$value2<.75] = .75
+dist_plot = ggplot() +geom_sf(data = shapefile_with_dist_long, colour = "light grey",mapping = aes(fill = value)) + 
+  scale_fill_gradient2(low="blue",high ="red",mid = "white",midpoint = 1,
+                       limits = c(0.95, 1.05),  # or tighter based on your data spread
+                       oob = scales::squish )+ # handles values outside limits gracefully) + 
+  facet_grid(month~metric) +
+  ggtitle(months[i])  + theme_bw(base_size=5)
+ggsave(dist_plot,filename = "testplot.png", width = 2.5, height = 50, limitsize = FALSE)
+ggsave(dist_plot, filename = paste0("visit_dist_plot",months[i],".png"))
 }
 
+ggplot() + geom_line(data = shapefile_with_dist, mapping = aes(x = month, y = avg_visitors, group = GEOID))
+
+ggplot(data = shapefile_with_dist, mapping = aes(x = month, y = distance_prop, group=GEOID)) + geom_point( ) + stat_summary(fun.data = mean_cl_normal, geom = "ribbon") 
+shapefile_with_dist_noshp = st_drop_geometry(shapefile_with_dist)
+grouped_summary <- shapefile_with_dist_noshp %>%
+  group_by(month) %>%
+  summarise(
+    Mean_Value = mean(distance_prop, na.rm = T),
+    Q1_Value = quantile(distance_prop, probs = 0.05, na.rm = T),
+    Median_Value = quantile(distance_prop, probs = 0.5, na.rm = T),
+    Q3_Value = quantile(distance_prop, probs = 0.95, na.rm = T))
+
+ggplot(data=grouped_summary) + geom_ribbon(mapping = aes(x = month, ymin = Q1_Value, ymax = Q3_Value), fill = "light gray") + geom_line(mapping = aes(x = month, y = Median_Value)) + geom_hline(yintercept = 1)
+ggplot() + geom_point(data = shapefile_with_dist, mapping = aes(x = distance_prop, y = avg_visitors))
+shapefile_with_dist_nona = subset(shapefile_with_dist, !is.na(distance_prop))
+cor(shapefile_with_dist_nona$distance_prop, shapefile_with_dist_nona$avg_visitors)
 months_pre = months[which(months < as.Date("2020-03-01"))]
 months_during = months[-which(months < as.Date("2020-03-01"))]
 centroids_cbg_sf_dist_sub_pre = subset(centroids_cbg_sf_dist, is.element(month,months_pre)) %>% st_drop_geometry()
