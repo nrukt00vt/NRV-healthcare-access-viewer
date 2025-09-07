@@ -26,56 +26,6 @@ centroids_cbgs = st_centroid(shapefile) %>% st_set_crs(4326)
 #Get all unique healthcare IDs; we will start to fill in a dataframe where we also fill in the average travel distance to there
 unique_healthcare_ids = unique(overall_trips$safegraph_place_id)
 unique_months = unique(overall_trips$month)
-healthcare_dist = expand.grid(ID = unique_healthcare_ids, distance = 0,month = unique_months)
-
-#### Healthcare facility based distance calculation
-#Iterates row by row; doesn't actually need nested for loops
-
-
-for (i in 1:length(healthcare_dist$ID)){
-  working_month = healthcare_dist$month[i]
-  working_id = healthcare_dist$ID[i]
-  print(working_id)
-  
-  #subset all trips to the healthcare facility
-  trips_to_healthcare = subset(overall_trips,safegraph_place_id == working_id & month == working_month)
-  #associate each row with the corresponding CBG centroid
-  trips_to_healthcare_w_centroids = merge(trips_to_healthcare,centroids_cbgs,by.x="visitor_home_cbg",by.y="GEOID")
-  trips_to_healthcare_w_centroids = st_as_sf(trips_to_healthcare_w_centroids) %>%   st_set_crs(4326)
-  
-  #create a point for the healthcare facility
-  healthcare_point = st_as_sf(subset(health_POIs, safegraph_place_id == working_id), coords = c("longitude","latitude"))%>% 
-    st_set_crs(4326)
-  
-  #calculate distance between healthcare facility and all the CBG centroids
-  trips_to_healthcare_w_centroids$distances = as.numeric(st_distance(healthcare_point,trips_to_healthcare_w_centroids))
-  #create a weighted average for trips to the healthcare facility
-  weighted_average_distance = sum(trips_to_healthcare_w_centroids$distances * trips_to_healthcare_w_centroids$total_visitors / sum(trips_to_healthcare_w_centroids$total_visitors))
-  
-  #add this distance to the healthcare with distances traveled dataframe -- note that this is putting it in the first row because it involves the first healthcare facility;
-  #as you run through the for loop, you will want to make sure it's placed in the corresponding row
-  healthcare_dist$distance[i] = weighted_average_distance
-  
-  
-}
-
-
-
-#plotting
-healthcare_dist = subset(healthcare_dist, distance > 0)
-
-hist(healthcare_dist$distance)
-health_POIs_sf = st_as_sf(health_POIs, coords = c("longitude","latitude"))%>% 
-  st_set_crs(4326)
-healthcare_dist = subset(healthcare_dist, month == "2019-07-01")
-health_POIs_sf_dist = merge(health_POIs_sf,healthcare_dist, by.x="safegraph_place_id", by.y = "ID")
-health_POIs_sf_dist = health_POIs_sf_dist[order(health_POIs_sf_dist$distance,decreasing=T),]
-health_POIs_sf_dist = subset(health_POIs_sf_dist,distance < 40000)
-ggplot() + geom_sf(data = shapefile) +
-  geom_sf(data = health_POIs_sf_dist, mapping = aes(colour = distance)) + 
-  scale_colour_distiller(palette = "YlOrRd",trans="log10",direction = 1) + ylim(c(37,37.3)) + xlim(c(-81,-80))
-
-
 #### Calculating distance traveled by people in each cbg
 #create dataset with all cbgs, which will be filled in with distances traveled by people in each CBG
 #This will use broadly the same logic, just will be focused on CBGs rather than healthcare facilities
@@ -172,14 +122,10 @@ dist_plot = ggplot() +geom_sf(data = shapefile_with_dist_long, colour = "light g
                        limits = c(0.95, 1.05),  # or tighter based on your data spread
                        oob = scales::squish )+ # handles values outside limits gracefully) + 
   facet_grid(month~metric) +
-  ggtitle(months[i])  + theme_bw(base_size=5)
+   theme_bw(base_size=5)
 ggsave(dist_plot,filename = "testplot.png", width = 2.5, height = 50, limitsize = FALSE)
-ggsave(dist_plot, filename = paste0("visit_dist_plot",months[i],".png"))
-}
 
-ggplot() + geom_line(data = shapefile_with_dist, mapping = aes(x = month, y = avg_visitors, group = GEOID))
 
-ggplot(data = shapefile_with_dist, mapping = aes(x = month, y = distance_prop, group=GEOID)) + geom_point( ) + stat_summary(fun.data = mean_cl_normal, geom = "ribbon") 
 shapefile_with_dist_noshp = st_drop_geometry(shapefile_with_dist)
 grouped_summary <- shapefile_with_dist_noshp %>%
   group_by(month) %>%
@@ -190,95 +136,29 @@ grouped_summary <- shapefile_with_dist_noshp %>%
     Q3_Value = quantile(distance_prop, probs = 0.95, na.rm = T))
 
 ggplot(data=grouped_summary) + geom_ribbon(mapping = aes(x = month, ymin = Q1_Value, ymax = Q3_Value), fill = "light gray") + geom_line(mapping = aes(x = month, y = Median_Value)) + geom_hline(yintercept = 1)
-ggplot() + geom_point(data = shapefile_with_dist, mapping = aes(x = distance_prop, y = avg_visitors))
-shapefile_with_dist_nona = subset(shapefile_with_dist, !is.na(distance_prop))
-cor(shapefile_with_dist_nona$distance_prop, shapefile_with_dist_nona$avg_visitors)
+
+
 months_pre = months[which(months < as.Date("2020-03-01"))]
 months_during = months[-which(months < as.Date("2020-03-01"))]
 centroids_cbg_sf_dist_sub_pre = subset(centroids_cbg_sf_dist, is.element(month,months_pre)) %>% st_drop_geometry()
-centroids_cbg_sf_dist_sub_pre = aggregate(centroids_cbg_sf_dist_sub_pre$avg_dist, by = list(centroids_cbg_sf_dist_sub_pre$GEOID), FUN = median)
-names(centroids_cbg_sf_dist_sub_pre) = c("GEOID", "dist")
+centroids_cbg_sf_dist_sub_pre = aggregate(centroids_cbg_sf_dist_sub_pre$avg_visitors, by = list(centroids_cbg_sf_dist_sub_pre$GEOID), FUN = median)
+names(centroids_cbg_sf_dist_sub_pre) = c("GEOID", "visits")
 shapefile_with_dist_pre = merge(shapefile, st_drop_geometry(centroids_cbg_sf_dist_sub_pre),by="GEOID")
-ggplot() +geom_sf(data = shapefile_with_dist_pre, colour = "light grey",mapping = aes(fill = dist)) + 
+ggplot() +geom_sf(data = shapefile_with_dist_pre, colour = "light grey",mapping = aes(fill = visits)) + 
   scale_fill_distiller(palette = "Spectral")
 
 centroids_cbg_sf_dist_sub_during = subset(centroids_cbg_sf_dist, is.element(month,months_during)) %>% st_drop_geometry()
-centroids_cbg_sf_dist_sub_during = aggregate(centroids_cbg_sf_dist_sub_during$avg_dist, by = list(centroids_cbg_sf_dist_sub_during$GEOID), FUN = median)
+centroids_cbg_sf_dist_sub_during = aggregate(centroids_cbg_sf_dist_sub_during$avg_visitors, by = list(centroids_cbg_sf_dist_sub_during$GEOID), FUN = median)
 names(centroids_cbg_sf_dist_sub_during) = c("GEOID", "dist")
 shapefile_with_dist_during = merge(shapefile, st_drop_geometry(centroids_cbg_sf_dist_sub_during),by="GEOID")
 ggplot() +geom_sf(data = shapefile_with_dist_during, colour = "light grey",mapping = aes(fill = dist)) + 
   scale_fill_distiller(palette = "Spectral")
 
 
-input_data <- read.csv("~/Documents/GitHub/NRV-healthcare-access-viewer/NRHDcovariate.csv")
-is.element(cbg_number_visits$home_cbg)
-
-cbg_number_visits = aggregate(overall_trips$total_visitors, by = list(overall_trips$visitor_home_cbg,
-                                                                      overall_trips$month),
-                              FUN = sum)
-names(cbg_number_visits) = c("home_cbg", "month", "total_visitors")
-
-cbg_number_visits = subset(cbg_number_visits, total_visitors > 0)
-cbg_number_visits = merge(cbg_number_visits, input_data, by.x= "home_cbg", by.y = "cbg2019")
-cbg_number_visits$prop_urban_cut = cut(cbg_number_visits$prop_urban,c(0, 0.05, 0.18, .95,1.1))
-cbg_number_visits_agg = aggregate(cbg_number_visits$total_visitors, by = list(cbg_number_visits$prop_urban_cut,
-                                                                              cbg_number_visits$month),
-                                  FUN = median)
-
-names(cbg_number_visits_agg) = c("prop_urb", "month", "trips")
-unique_codes = unique(cbg_number_visits_agg$prop_urb)
-cbg_data = data.frame()
-for (code in unique_codes){
-  sub_data = subset(cbg_number_visits_agg, prop_urb == code)
-  sub_data$num_normalized = sub_data$trips / median(sub_data$trips)
-  cbg_data = rbind(cbg_data, sub_data)
-}
-
-ggplot() + geom_line(data = cbg_data, mapping = aes(x = month, y = num_normalized, colour = prop_urb, group = prop_urb)) +
-  ggtitle("HF trips, by urban/rural")
-cbg_feb_2020 = subset(cbg_number_visits, month == "2020-02-01")
-
-# Merge Feb 2020 data, using home cbg, back into cbg_number_visits, so that we have the feb 2020 total visitor numbers to compare each month's numbers against
-# The ratio we will plot is the total visitors / feb 2020 visitors 
-# This will require renaming the feb 2020 data (rename total_visitors in this dataset), and using the "merge" function
-
-names(cbg_feb_2020)[which(names(cbg_feb_2020) == "total_visitors")] = "feb_2020_visitors"
-cbg_feb_2020 = subset(cbg_feb_2020, select = -c(month))
-cbg_number_visits = merge(cbg_number_visits, cbg_feb_2020, by = c("home_cbg"))
-
-cbg_number_visits$ratio_to_feb_2020 = cbg_number_visits$total_visitors / cbg_number_visits$feb_2020_visitors
-
-`#Then, subset each month using subset function, merge it with the shapefile, and plot the shapefile (similar to the above code) for each month
-
-unique_months = unique(cbg_number_visits$month)
-
-month_select = unique_months[2]
-
-cbg_number_visits_subset = subset(cbg_number_visits, month == month_select)
-shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
-
-ggplot() + geom_sf(shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020))+
-  scale_fill_gradient2(midpoint = 1, high ="#d73027", mid = "#ffffff", low = "#4575b4") +
-  ggtitle(month_select)
-
-cbg_number_visits_wdat =merge(cbg_number_visits, input_data, by.x = "home_cbg", by.y = "cbg2019")
-cbg_number_visits_wdat$urban_cat = cut(cbg_number_visits_wdat$prop_urban, breaks = c(0,.05, .2, .8,1.1))
-cbg_number_visits_wdat$income_cat = cut(cbg_number_visits_wdat$Income.below..25.000, breaks = c(0,16, 21, 30,85))
-
-cbg_number_visits_urban = aggregate(cbg_number_visits_wdat$ratio_to_feb_2020, FUN = mean,by = list(cbg_number_visits_wdat$urban_cat,
-                                                                                                   cbg_number_visits_wdat$month))
-names(cbg_number_visits_urban) = c("urban", "month","ratio_to_feb_2020")
-ggplot() + geom_line(data = cbg_number_visits_urban, mapping = aes(x = month,y = ratio_to_feb_2020,group = urban, colour = urban))
-
-
-cbg_number_visits_income = aggregate(cbg_number_visits_wdat$ratio_to_feb_2020, FUN = mean,by = list(cbg_number_visits_wdat$income_cat,
-                                                                                                    cbg_number_visits_wdat$month))
-names(cbg_number_visits_income) = c("income", "month","ratio_to_feb_2020")
-ggplot() + geom_line(data = cbg_number_visits_income, mapping = aes(x = month,y = ratio_to_feb_2020,group = income, colour = income))
-cbg_number_visits_wdat$month))
 
 
 
+##### All data from here; not HF specific
 #Read in the shapefile as an "sf" object
 #shapefile = read_sf(dsn ="base_files", layer= "tl_2022_51_bg")
 all_POIs = read.csv('AllPOIs_Montgomery_VA.csv')
@@ -361,7 +241,7 @@ for (month_select in unique_months) {
   ggsave(plot, filename = paste0("shapefile_with_visitors_", month_select, ".png"), height = 6, width = 5)
 }
 
-
+NRHDcovariate = read.csv("NRHDcovariate.csv")
 create_shapefile_with_visitors = function(month_chosen, shapefile, cbg_number_visits) {
   
   cbg_number_visits_subset = subset(cbg_number_visits, month == month_chosen)
@@ -371,7 +251,7 @@ return(shapefile_with_visits)
 shapefile_aug_2020 = create_shapefile_with_visitors("2020-08-01",shapefile,cbg_number_visits)
 #Merge the NRHD_covariates with the shapefile
 
-merged_data <- merge(shapefile_aug_2020, NRHDcovariate, by.x = "GEOID", by.y = "ct2021", all = TRUE)
+merged_data <- merge(shapefile_aug_2020, NRHDcovariate, by.x = "GEOID", by.y = "cbg2019", all = TRUE)
 
 merged_data_no_na = subset(merged_data, !is.na(merged_data$ratio_to_feb_2020))
 #change out predictors with predcitors from NRHD_covariates
