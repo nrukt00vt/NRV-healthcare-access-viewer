@@ -1,69 +1,152 @@
-library(sf)
-library(tidyverse)
+# -----------------------------
+# Libraries
+# -----------------------------
+library(sf)          # for spatial data (CBG polygons)
+library(tidyverse)   # for data wrangling + ggplot2
+library(lubridate)   # needed for year()/month() used below (load early!)
+library(plyr)
 
-##### All data from here; not HF specific
-#Read in the shapefile as an "sf" object
-#shapefile = read_sf(dsn ="base_files", layer= "tl_2022_51_bg")
-all_POIs = read.csv('AllPOIs_Montgomery_VA.csv')
-input_data = read.csv("NRHDcovariate.csv")
-#Read in the time series data
-time_data = read.csv("allvisits_VA_new.csv")
+# -----------------------------
+# Inputs (CSV + Shapefile)
+# -----------------------------
+# all_POIs: metadata for POIs (must include safegraph_place_id, city, naics_code or naics_code_2, etc.)
+all_POIs   = read.csv('AllPOIs_Montgomery_VA.csv')
 
+# NRHD_data: CBG-level covariates (must include 'cbg2019' and 'prop_urban' in [0,1])
+NRHD_data  = read.csv("NRHDcovariate.csv")
+
+# time_data: visit counts to POIs over time
+time_data  = read.csv("allvisits_VA_new.csv")
+
+# Shapefile of 2019 VA Census Block Groups (51 = Virginia)
+shapefile  = read_sf(dsn = "base_files", layer = "tl_2019_51_bg")
+
+# -----------------------------
+# Basic cleaning / harmonization
+# -----------------------------
+
+# Rename visit count column from 'number' -> 'total_visitors' in time_data
 names(time_data)[which(names(time_data) == "number")] = "total_visitors"
-overall_trips_all = merge(all_POIs,time_data, by.x="safegraph_place_id",by.y="safegraph_place")
-overall_trips_all$month = as.Date(paste0(year(overall_trips_all$date),"-",month(overall_trips_all$date),"-01"))
 
-hf_trips_all = subset( overall_trips_all, is.element(naics_code, c(621210, 621340, 621111, 621493, 622110)))
-cbg_number_visits_all = aggregate(overall_trips_all$total_visitors, by = list(overall_trips_all$visitor_home_cbg,
-                                                                          overall_trips_all$date),
-                              FUN = sum)
+# Merge POI metadata to visits by POI ID
+# WARNING: Ensure the right-hand key matches your time_data: 'safegraph_place' vs 'safegraph_place_id'.
+# If your time_data column is 'safegraph_place_id', change by.y accordingly.
+overall_trips_all = merge(
+  all_POIs, time_data,
+  by.x = "safegraph_place_id",
+  by.y = "safegraph_place"
+)
 
-names(cbg_number_visits_all) = c("home_cbg", "month", "total_visitors")
+# Restrict geography by removing out-of-area cities (example: not in NRHD)
+overall_trips_all = subset(overall_trips_all, !is.element(city, c("Leesburg", "Lansdowne")))
+
+# Create a "month" identifier as the first day of each month.
+# NOTE: Requires lubridate::year() and lubridate::month().
+# If time_data$date is a character, convert first: time_data$date <- as.Date(time_data$date)
+overall_trips_all$month = as.Date(
+  paste0(year(overall_trips_all$date), "-", month(overall_trips_all$date), "-01")
+)
+
+# -----------------------------
+# Subset to healthcare POIs (NAICS codes)
+# -----------------------------
+# NAICS used here:
+#   621210 = Dentists
+#   621340 = Outpatient PT/OT/Speech
+#   621111 = Offices of Physicians
+#   621493 = Freestanding Urgent Care
+#   622110 = General Medical & Surgical Hospitals
+hf_trips_all = subset(
+  overall_trips_all,
+  is.element(naics_code, c(621210, 621340, 621111, 621493, 622110))
+)
+
+# -----------------------------
+# Aggregate visits by home CBG and day, then build Feb 2020 baseline
+# -----------------------------
+cbg_number_visits_all = aggregate(
+  overall_trips_all$total_visitors,
+  by = list(overall_trips_all$visitor_home_cbg, overall_trips_all$date),
+  FUN = sum
+)
+names(cbg_number_visits_all) = c("home_cbg", "month", "total_visitors")  # 'month' currently holds daily dates
 cbg_number_visits_all = subset(cbg_number_visits_all, total_visitors > 0)
 
-cbg_feb_2020_all = subset(cbg_number_visits_all,  month > as.Date("2020-01-31") & month < as.Date("2020-03-01"))
+# Pull Feb 2020 rows to be used as the pre-pandemic baseline
+cbg_feb_2020_all = subset(
+  cbg_number_visits_all,
+  month > as.Date("2020-01-31") & month < as.Date("2020-03-01")
+)
 
+# Keep only the Feb 2020 total and rename for later merge
 names(cbg_feb_2020_all)[which(names(cbg_feb_2020_all) == "total_visitors")] = "feb_2020_visitors"
 cbg_feb_2020_all = subset(cbg_feb_2020_all, select = -c(month))
+
+# Join Feb 2020 baseline back to full time series by home CBG
 cbg_number_visits_all = merge(cbg_number_visits_all, cbg_feb_2020_all, by = c("home_cbg"))
 
-cbg_number_visits_all$ratio_to_feb_2020 = cbg_number_visits_all$total_visitors / cbg_number_visits_all$feb_2020_visitors
+# Normalize each CBG-day by its own Feb 2020 value.
+# NOTE: If a CBG has 0 visits in Feb 2020, this will produce Inf; consider guarding against division by zero.
+cbg_number_visits_all$ratio_to_feb_2020 =
+  cbg_number_visits_all$total_visitors / cbg_number_visits_all$feb_2020_visitors
+# e.g., to guard:
+# cbg_number_visits_all$ratio_to_feb_2020[!is.finite(cbg_number_visits_all$ratio_to_feb_2020)] <- NA
 
-hf_number_visits_all = aggregate(hf_trips_all$total_visitors, by = list(hf_trips_all$visitor_home_cbg,
-                                                                        hf_trips_all$date),
-                                  FUN = sum)
-
+# -----------------------------
+# Repeat aggregation for healthcare-only trips
+# -----------------------------
+hf_number_visits_all = aggregate(
+  hf_trips_all$total_visitors,
+  by = list(hf_trips_all$visitor_home_cbg, hf_trips_all$date),
+  FUN = sum
+)
 names(hf_number_visits_all) = c("home_cbg", "month", "total_visitors")
 hf_number_visits_all = subset(hf_number_visits_all, total_visitors > 0)
 
 hf_feb_2020_all = subset(hf_number_visits_all, month > as.Date("2020-01-31") & month < as.Date("2020-03-01"))
-
 names(hf_feb_2020_all)[which(names(hf_feb_2020_all) == "total_visitors")] = "feb_2020_visitors"
 hf_feb_2020_all = subset(hf_feb_2020_all, select = -c(month))
+
 hf_number_visits_all = merge(hf_number_visits_all, hf_feb_2020_all, by = c("home_cbg"))
+hf_number_visits_all$ratio_to_feb_2020 =
+  hf_number_visits_all$total_visitors / hf_number_visits_all$feb_2020_visitors
+# (Consider the same division-by-zero guard as above.)
 
-hf_number_visits_all$ratio_to_feb_2020 = hf_number_visits_all$total_visitors / hf_number_visits_all$feb_2020_visitors
-
-
+# -----------------------------
+# Merge CBG covariates and group by urbanicity bins
+# -----------------------------
+# Join covariates (prop_urban in [0,1]) to the all-trips series
 cbg_number_visits_all = subset(cbg_number_visits_all, total_visitors > 0)
-cbg_number_visits_all = merge(cbg_number_visits_all, input_data, by.x= "home_cbg", by.y = "cbg2019")
-cbg_number_visits_all$prop_urban_cut = cut(cbg_number_visits_all$prop_urban,c(0, 0.05, 0.18, .95,1.1))
-cbg_number_visits_agg_all = aggregate(cbg_number_visits_all$total_visitors, by = list(cbg_number_visits_all$prop_urban_cut,
-                                                                                  cbg_number_visits_all$month),
-                                  FUN = median)
+cbg_number_visits_all = merge(cbg_number_visits_all, NRHD_data, by.x = "home_cbg", by.y = "cbg2019")
 
+# Bin CBGs by prop_urban. Breaks chosen to create "very rural" / "rural" / "urban" / "very urban".
+# The upper bound 1.1 ensures values exactly equal to 1 fall inside the last bin.
+cbg_number_visits_all$prop_urban_cut = cut(cbg_number_visits_all$prop_urban, c(0, 0.05, 0.18, 0.95, 1.1))
 
+# For each urbanicity bin and date, compute median visitors (robust to outliers)
+cbg_number_visits_agg_all = aggregate(
+  cbg_number_visits_all$total_visitors,
+  by = list(cbg_number_visits_all$prop_urban_cut, cbg_number_visits_all$month),
+  FUN = median
+)
+
+# Repeat for healthcare-only
 hf_number_visits_all = subset(hf_number_visits_all, total_visitors > 0)
-hf_number_visits_all = merge(hf_number_visits_all, input_data, by.x= "home_cbg", by.y = "cbg2019")
-hf_number_visits_all$prop_urban_cut = cut(hf_number_visits_all$prop_urban,c(0, 0.05, 0.18, .95,1.1))
-hf_number_visits_agg_all = aggregate(hf_number_visits_all$total_visitors, by = list(hf_number_visits_all$prop_urban_cut,
-                                                                                      hf_number_visits_all$month),
-                                      FUN = median)
+hf_number_visits_all = merge(hf_number_visits_all, NRHD_data, by.x = "home_cbg", by.y = "cbg2019")
+hf_number_visits_all$prop_urban_cut = cut(hf_number_visits_all$prop_urban, c(0, 0.05, 0.18, 0.95, 1.1))
+hf_number_visits_agg_all = aggregate(
+  hf_number_visits_all$total_visitors,
+  by = list(hf_number_visits_all$prop_urban_cut, hf_number_visits_all$month),
+  FUN = median
+)
 
+# -----------------------------
+# Normalize series within each urbanicity bin by each bin's own median
+# -----------------------------
 names(cbg_number_visits_agg_all) = c("prop_urb", "month", "trips")
 unique_codes = unique(cbg_number_visits_agg_all$prop_urb)
 cbg_data_all = data.frame()
-for (code in unique_codes){
+for (code in unique_codes) {
   sub_data = subset(cbg_number_visits_agg_all, prop_urb == code)
   sub_data$num_normalized = sub_data$trips / median(sub_data$trips)
   cbg_data_all = rbind(cbg_data_all, sub_data)
@@ -72,118 +155,148 @@ for (code in unique_codes){
 names(hf_number_visits_agg_all) = c("prop_urb", "month", "trips")
 unique_codes = unique(hf_number_visits_agg_all$prop_urb)
 hf_data_all = data.frame()
-for (code in unique_codes){
+for (code in unique_codes) {
   sub_data = subset(hf_number_visits_agg_all, prop_urb == code)
   sub_data$num_normalized = sub_data$trips / median(sub_data$trips)
   hf_data_all = rbind(hf_data_all, sub_data)
 }
 
-ggplot() + geom_line(data = cbg_data_all, mapping = aes(x = month, y = num_normalized, colour = prop_urb, group = prop_urb)) +
+# -----------------------------
+# Plots: normalized trends by urbanicity
+# -----------------------------
+ggplot() +
+  geom_line(data = cbg_data_all,
+            mapping = aes(x = month, y = num_normalized, colour = prop_urb, group = prop_urb)) +
   ggtitle("All trips, by urban/rural")
 
-ggplot() + geom_line(data = hf_data_all, mapping = aes(x = month, y = num_normalized, colour = prop_urb, group = prop_urb)) +
+ggplot() +
+  geom_line(data = hf_data_all,
+            mapping = aes(x = month, y = num_normalized, colour = prop_urb, group = prop_urb)) +
   ggtitle("Healthcare trips, by urban/rural")
-# plotting shapefile with visitor data for each month
 
-cbg_number_visits_all$month_agg = as.Date(paste0(year(cbg_number_visits_all$month),"-",
-                                                 month(cbg_number_visits_all$month), "-01"
-                                                 ))
-cbg_number_visits_agg_all = aggregate(cbg_number_visits_all$total_visitors, by = list(cbg_number_visits_all$prop_urban_cut,
-                                                                                      cbg_number_visits_all$month_agg),
-                                      FUN = median)
+# -----------------------------
+# Choropleths by month (NRHD only)
+# -----------------------------
 
+# Convert daily dates to the first of month for mapping
+cbg_number_visits_all$month_agg = as.Date(paste0(
+  year(cbg_number_visits_all$month), "-", month(cbg_number_visits_all$month), "-01"
+))
 
+# Aggregate median by month_agg and urbanicity (consistent with previous approach)
+cbg_number_visits_agg_all = aggregate(
+  cbg_number_visits_all$total_visitors,
+  by = list(cbg_number_visits_all$prop_urban_cut, cbg_number_visits_all$month_agg),
+  FUN = median
+)
+
+# Helper: draw a filled CBG choropleth for a chosen month,
+# filling by ratio_to_feb_2020 (blue <1, white ~1, red >1)
 plot_shapefile_with_visitors = function(month_chosen, shapefile, cbg_number_visits) {
- 
+  
+  # Filter to the chosen month’s CBG metrics
   cbg_number_visits_subset = subset(cbg_number_visits, month_agg == month_chosen)
+  
+  # Merge metrics onto CBG polygons (ensure both GEOID and home_cbg are same class, e.g., character)
   shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
   
-   plot_with_visitors = ggplot() + geom_sf(data = shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020)) +
-    scale_fill_gradient2(midpoint = 1, high = "#d73027", mid = "#ffffff", low = "#4575b4") + theme_minimal(base_size = 8)+ theme(legend.position="bottom")+
-    ggtitle(month_chosen)
+  plot_with_visitors =
+    ggplot() +
+    geom_sf(data = shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020)) +
+    scale_fill_gradient2(midpoint = 1, high = "#d73027", mid = "#ffffff", low = "#4575b4") +
+    theme_minimal(base_size = 8) +
+    theme(legend.position = "bottom") +
+    ggtitle(as.character(month_chosen))
   
   return(plot_with_visitors)
 }
+
+# Unique months available from merged dataset
 unique_months = unique(overall_trips_all$month)
 
+# Pick one example month to preview
 month_select_2 = unique_months[1]
 
-shapefile = read_sf(dsn ="base_files", layer= "tl_2019_51_bg")
-#New River Health District only
-shapefile = subset(shapefile,is.element(COUNTYFP,c("063","121","155","750","071")))
+# Filter shapefile to NRHD (FIPS codes):
+#   063 = Floyd, 071 = Giles, 121 = Montgomery, 155 = Pulaski, 750 = Radford City
+shapefile = subset(shapefile, is.element(COUNTYFP, c("063", "071", "121", "155", "750")))
+
+# Preview a single month
 plot_shapefile_with_visitors(month_select_2, shapefile, cbg_number_visits_all)
+plot_shapefile_with_visitors(month_select_2, shapefile, hf_number_visits_all)
+
+# Save a PNG for each available month
 for (month_select in unique_months) {
   print(month_select)
-  plot = plot_shapefile_with_visitors(month_select, shapefile, cbg_number_visits_all)
-  ggsave(plot, filename = paste0("shapefile_with_visitors_", month_select, ".png"), height = 6, width = 5)
+  plot_obj = plot_shapefile_with_visitors(month_select, shapefile, cbg_number_visits_all)
+  
+  # FIX: ggsave expects 'filename' first (as a string). Use named args to avoid confusion.
+  ggsave(filename = paste0("shapefile_with_visitors_", month_select, ".png"),
+         plot = plot_obj, height = 6, width = 5)
 }
 
-NRHDcovariate = read.csv("NRHDcovariate.csv")
-library(lubridate)
+# -----------------------------
+# Simple regression example: urbanicity vs. reduction in trips (Aug 2020)
+# -----------------------------
 create_shapefile_with_visitors = function(month_chosen, shapefile, cbg_number_visits) {
   
   cbg_number_visits_subset = subset(cbg_number_visits_all, month_agg == month_chosen)
   shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
-return(shapefile_with_visits)
+  return(shapefile_with_visits)
 }
-shapefile_aug_2020_cbg = create_shapefile_with_visitors(month_chosen = as.Date("2020-08-01"),shapefile,cbg_number_visits_all)
-#Merge the NRHD_covariates with the shapefile
 
-#merged_data_cbg <- merge(shapefile_aug_2020_cbg, NRHDcovariate, by.x = "GEOID", by.y = "cbg2021", all = TRUE)
+shapefile_aug_2020_cbg = create_shapefile_with_visitors(
+  month_chosen = as.Date("2020-08-01"), shapefile, cbg_number_visits_all
+)
 
-#merged_data_no_na_cbg = subset(merged_data_cbg, !is.na(merged_data_cbg$ratio_to_feb_2020))
-#change out predictors with predcitors from NRHD_covariates
-
+# Regress ratio_to_feb_2020 on prop_urban for a single month (illustrative, not causal)
 summary(lm(shapefile_aug_2020_cbg$ratio_to_feb_2020 ~ shapefile_aug_2020_cbg$prop_urban))
 
+# -----------------------------
+# Sectoral time series by NAICS 2-digit code
+# -----------------------------
 
-#### Trips by location type
-#read.csv: will read a certain file, data input
-health_POIs = read.csv('AllPOIs_Montgomery_VA.csv')
+# Aggregate visits by date and NAICS 2-digit sector
+# IMPORTANT:
+# - Earlier we renamed 'number' -> 'total_visitors'. The merged table therefore has 'total_visitors'.
 
-#Read in the time series data
-time_data = read.csv("allvisits_VA_new.csv")
-#remove records where nobody visited the corresponding healthcare facility
-#subset: will indicate which rows to keep
-#is.na: not available (since ! is before it would be available)
-time_data = subset(time_data, !is.na(time_data$visitor_home_cbg))
-#merge the dataset with the locations & types of the healthcare facilities
-time_data_merged = merge(time_data,health_POIs,
-                         by.x="safegraph_place",by.y="safegraph_place_id")
+overall_trips_all$naics_code_2 = substr(overall_trips_all$naics_code,1,2)
+NAICS_aggregate = aggregate(
+  overall_trips_all$total_visitors,                              # CHANGED from $number -> $total_visitors
+  by = list(overall_trips_all$date, overall_trips_all$naics_code_2),
+  FUN = sum
+)
 
-time_data_merged=subset(time_data_merged, !is.element(city,c("Leesburg","Lansdowne")))
-#You'll want to make two plots, one with every NAICS code, and then one with the "grouped" NAICS codes, which we will create below:
+# Label the columns
+names(NAICS_aggregate) = c("date", "NAICS", "num")
 
-#Aggregate by NAICS code; this means we will sum up all the different doctors for each NAICS code to get one result per NAICS code
-# $ in between is the data set's specified field.
-# FUN: function will be a sum.
-time_data_merged$naics_code_2 = substr(time_data_merged$naics_code,1,2)
-#Aggregate: get the summary stats of the data group
-NAICS_aggregate = aggregate(time_data_merged$number , 
-                            by=list(time_data_merged$date,time_data_merged$naics_code_2), FUN = sum)
-
-# these declare the names of each data set into vectors
-names(NAICS_aggregate) = c("date","NAICS","num")
-
-#The way we are normalizing is by dividing each number by the median number of trips to that NAICS code; therefore the output number can be represented as "% of trips compared to median"
-#2 means 2x as many trips as median, .5 means half as many, etc.
+# Normalize each NAICS series by its own median (robust scaler)
 unique_codes = unique(NAICS_aggregate$NAICS)
 NAICS_data = data.frame()
-for (code in unique_codes){
+for (code in unique_codes) {
   sub_data = subset(NAICS_aggregate, NAICS == code)
-  sub_data$num_normalized = sub_data$num / median(sub_data$num)
+  sub_data$num_normalized = sub_data$num / median(sub_data$num, na.rm = T)
   NAICS_data = rbind(NAICS_data, sub_data)
 }
 
-#Plotting
-NAICS_data$date = as.Date(NAICS_data$date)
-
+# Prepare for plotting
+NAICS_data$date  = as.Date(NAICS_data$date)
 NAICS_data$NAICS = as.factor(NAICS_data$NAICS)
-library(plyr)
-NAICS_data$NAICS_name = revalue(NAICS_data$NAICS, c(
-  "44" = "Grocery", "45" = "Department", "61" = "Schools", "62" = "Healthcare",
-  "71" = "Recreation", "72" = "Restaurants"))
-ggplot() + geom_line(data=NAICS_data, mapping = aes(x=date,
-                                                    y = num_normalized, colour = NAICS_name , group = NAICS_name)) + scale_colour_brewer(palette="Set1")
+
+# Map 2-digit NAICS to human-readable sector names.
+# Tip: If avoiding plyr, you can use:
+# NAICS_data$NAICS_name <- dplyr::recode(NAICS_data$NAICS, `44`="Grocery", `45`="Department", ...)
+# Using plyr::revalue below if you prefer:
+ library(plyr)
+ NAICS_data$NAICS_name = revalue(NAICS_data$NAICS, c(
+   "44" = "Grocery", "45" = "Department", "61" = "Schools", "62" = "Healthcare",
+   "71" = "Recreation", "72" = "Restaurants"
+ ))
 
 
+# Plot normalized sector trends
+ggplot() +
+  geom_line(data = NAICS_data,
+            mapping = aes(x = date, y = num_normalized, colour = NAICS_name, group = NAICS_name)) +
+  scale_colour_brewer(palette = "Set1") +
+  ggtitle("POI visits by sector (normalized by sector median)")
