@@ -179,6 +179,18 @@ ggplot() +
 # -----------------------------
 
 # Convert daily dates to the first of month for mapping
+hf_number_visits_all$month_agg = as.Date(paste0(
+  year(hf_number_visits_all$month), "-", month(hf_number_visits_all$month), "-01"
+))
+
+# Aggregate median by month_agg and urbanicity (consistent with previous approach)
+hf_number_visits_agg_all = aggregate(
+  hf_number_visits_all$total_visitors,
+  by = list(hf_number_visits_all$prop_urban_cut, hf_number_visits_all$month_agg),
+  FUN = median
+)
+
+# Convert daily dates to the first of month for mapping
 cbg_number_visits_all$month_agg = as.Date(paste0(
   year(cbg_number_visits_all$month), "-", month(cbg_number_visits_all$month), "-01"
 ))
@@ -189,24 +201,31 @@ cbg_number_visits_agg_all = aggregate(
   by = list(cbg_number_visits_all$prop_urban_cut, cbg_number_visits_all$month_agg),
   FUN = median
 )
-
 # Helper: draw a filled CBG choropleth for a chosen month,
 # filling by ratio_to_feb_2020 (blue <1, white ~1, red >1)
-plot_shapefile_with_visitors = function(month_chosen, shapefile, cbg_number_visits) {
+plot_shapefile_with_visitors = function(month_chosen, shapefile, cbg_number_visits, hf_visits) {
   
   # Filter to the chosen month’s CBG metrics
   cbg_number_visits_subset = subset(cbg_number_visits, month_agg == month_chosen)
+  # Filter to the chosen month’s CBG metrics
+  hf_number_visits_subset = subset(hf_visits, month_agg == month_chosen)
   
   # Merge metrics onto CBG polygons (ensure both GEOID and home_cbg are same class, e.g., character)
-  shapefile_with_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
+  shapefile_with_cbg_visits = merge(shapefile, cbg_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
+  shapefile_with_cbg_visits$id = "cbg"
   
+  shapefile_with_hf_visits = merge(shapefile, hf_number_visits_subset, by.x = "GEOID", by.y = "home_cbg")
+  shapefile_with_hf_visits$id = "hf"
+  
+  shapefile_all_visits = rbind(shapefile_with_hf_visits,shapefile_with_cbg_visits)
   plot_with_visitors =
     ggplot() +
-    geom_sf(data = shapefile_with_visits, mapping = aes(fill = ratio_to_feb_2020)) +
-    scale_fill_gradient2(midpoint = 1, high = "#d73027", mid = "#ffffff", low = "#4575b4") +
-    theme_minimal(base_size = 8) +
+    geom_sf(data = shapefile_all_visits, mapping = aes(fill = log(ratio_to_feb_2020)), colour = NA) +
+    scale_fill_gradient2(midpoint = 0, high = "#a50026", mid = "#ffffff", low = "#313695") +
+    theme_minimal(base_size = 8) + 
     theme(legend.position = "bottom") +
-    ggtitle(as.character(month_chosen))
+    facet_grid(~id)+
+    ggtitle(format(month_chosen, "%Y-%m-%d"))
   
   return(plot_with_visitors)
 }
@@ -221,18 +240,14 @@ month_select_2 = unique_months[1]
 #   063 = Floyd, 071 = Giles, 121 = Montgomery, 155 = Pulaski, 750 = Radford City
 shapefile = subset(shapefile, is.element(COUNTYFP, c("063", "071", "121", "155", "750")))
 
-# Preview a single month
-plot_shapefile_with_visitors(month_select_2, shapefile, cbg_number_visits_all)
-plot_shapefile_with_visitors(month_select_2, shapefile, hf_number_visits_all)
 
 # Save a PNG for each available month
-for (month_select in unique_months) {
+for (month_select in 1:length(unique_months)) {
   print(month_select)
-  plot_obj = plot_shapefile_with_visitors(month_select, shapefile, cbg_number_visits_all)
+  plot_obj = plot_shapefile_with_visitors(unique_months[month_select], shapefile, cbg_number_visits_all, hf_number_visits_all)
   
-  # FIX: ggsave expects 'filename' first (as a string). Use named args to avoid confusion.
-  ggsave(filename = paste0("shapefile_with_visitors_", month_select, ".png"),
-         plot = plot_obj, height = 6, width = 5)
+  ggsave(filename = paste0("D:/Downloads/shapefile_with_visitors_", unique_months[month_select], ".png"),
+         plot = plot_obj, height = 5, width = 9)
 }
 
 # -----------------------------
@@ -246,11 +261,11 @@ create_shapefile_with_visitors = function(month_chosen, shapefile, cbg_number_vi
 }
 
 shapefile_aug_2020_cbg = create_shapefile_with_visitors(
-  month_chosen = as.Date("2020-08-01"), shapefile, cbg_number_visits_all
+  month_chosen = as.Date("2020-09-01"), shapefile, cbg_number_visits_all
 )
 
 # Regress ratio_to_feb_2020 on prop_urban for a single month (illustrative, not causal)
-summary(lm(shapefile_aug_2020_cbg$ratio_to_feb_2020 ~ shapefile_aug_2020_cbg$prop_urban))
+summary(lm(cbg_number_visits_all$ratio_to_feb_2020 ~ cbg_number_visits_all$prop_urban))
 
 # -----------------------------
 # Sectoral time series by NAICS 2-digit code
@@ -264,7 +279,7 @@ overall_trips_all$naics_code_2 = substr(overall_trips_all$naics_code,1,2)
 NAICS_aggregate = aggregate(
   overall_trips_all$total_visitors,                              # CHANGED from $number -> $total_visitors
   by = list(overall_trips_all$date, overall_trips_all$naics_code_2),
-  FUN = sum
+  FUN = sum, na.rm=T
 )
 
 # Label the columns
