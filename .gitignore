@@ -49,3 +49,4 @@ po/*~
 rsconnect/
 
 base_files/
+.DS_Store
